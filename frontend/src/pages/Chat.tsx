@@ -63,7 +63,7 @@ export default function Chat() {
     return m;
   }, [conversations, user?._id]);
 
-  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+  const scrollMessagesToBottom = useCallback(() => {
     const el = messagesScrollRef.current;
     if (!el) return;
     
@@ -87,7 +87,7 @@ export default function Chat() {
   useLayoutEffect(() => {
     if (loadingMsgs) return;
     if (!stickToBottomRef.current) return;
-    scrollMessagesToBottom('auto');
+    scrollMessagesToBottom();
   }, [loadingMsgs, messages, activeConv?._id, scrollMessagesToBottom]);
 
   // Reset all chat state when the logged-in user changes (e.g. logout → login on same tab)

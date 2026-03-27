@@ -57,6 +57,7 @@ export default function EditJob() {
           budget: 5000, budgetType: 'fixed',
           deadline: new Date(Date.now() + 14 * 864e5).toISOString(),
           skills: ['React', 'Tailwind'], status: 'open',
+          locationType: 'remote',
           client: { _id: 'c1', name: 'Tech Startup PH', email: '', role: 'client', createdAt: '' },
           createdAt: new Date().toISOString(), updatedAt: '',
         };

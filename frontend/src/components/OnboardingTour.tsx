@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { X, ChevronRight, Briefcase, MessageSquare, User, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api';
@@ -34,7 +33,6 @@ const STEPS = [
 export default function OnboardingTour({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const { updateUser } = useAuth();
-  const navigate = useNavigate();
 
   const handleComplete = async () => {
     try {
