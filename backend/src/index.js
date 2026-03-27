@@ -82,7 +82,7 @@ app.use(logSecurityEvent);
 // Comma-separated browser origins for the web app (Vite). Native apps often send no Origin.
 const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
-  .map((s) => s.trim())
+  .map((s) => s.trim().replace(/\/$/, ''))
   .filter(Boolean);
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd) {
