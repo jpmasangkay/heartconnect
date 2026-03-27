@@ -509,9 +509,11 @@ export default function Chat() {
                   <div className="flex flex-col items-center justify-center h-full min-h-[200px] p-6 text-center">
                     <MessageSquare size={28} className="text-stone-300 mb-3" />
                     <p className="text-sm text-stone-muted">No conversations yet.</p>
-                    <Link to="/jobs" className="mt-2 text-xs text-accent hover:underline">
-                      Apply to a job to start chatting
-                    </Link>
+                    {user?.role === 'student' && (
+                      <Link to="/jobs" className="mt-2 text-xs text-accent hover:underline">
+                        Apply to a job to start chatting
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <div className="divide-y divide-stone-border">
