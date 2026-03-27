@@ -1,0 +1,62 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema({
+  name:      { type: String, required: true, trim: true },
+  email:     { type: String, required: true, unique: true, lowercase: true },
+  password:  { type: String, required: true, minlength: 12 },
+  role:      { type: String, enum: ['student', 'client', 'admin'], required: true },
+  avatar:    { type: String },
+  bio:       { type: String },
+  skills:    [{ type: String }],
+  location:  { type: String },
+  university:{ type: String },
+  portfolio: { type: String },
+
+  // Account security
+  failedAttempts: { type: Number, default: 0 },
+  lockedUntil:    { type: Date },
+
+  // Two-Factor Authentication
+  twoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret:  { type: String },
+  twoFactorMethod:  { type: String, enum: ['totp', 'email'] },
+  _email2FACode:    { type: String, select: false },
+
+  // Verification
+  isVerified:         { type: Boolean, default: false },
+  verificationMethod: { type: String, enum: ['school_email', 'id_upload', 'admin'] },
+  verificationDoc:    { type: String },
+  verificationStatus: { type: String, enum: ['none', 'pending', 'verified', 'rejected'], default: 'none' },
+
+  // Password Reset
+  resetPasswordToken:   { type: String },
+  resetPasswordExpires: { type: Date },
+
+  // Onboarding
+  hasCompletedOnboarding: { type: Boolean, default: false },
+
+  // Online presence
+  lastSeen: { type: Date },
+
+  // Blocking
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+
+  // Legal consent
+  agreedToTerms:   { type: Boolean, default: false },
+  agreedToTermsAt: { type: Date },
+}, { timestamps: true });
+
+userSchema.index({ role: 1, verificationStatus: 1 });
+
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+userSchema.methods.matchPassword = function (plain) {
+  return bcrypt.compare(plain, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);

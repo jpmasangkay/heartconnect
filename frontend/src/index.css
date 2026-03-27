@@ -1,0 +1,212 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+
+    /* ── New palette: Deep Forest · Ivory · Amber ─────────────────── */
+    --color-navy:         #1C3A28;   /* deep forest green  (was navy)       */
+    --color-navy-light:   #274F37;   /* medium forest      (was navy-light)  */
+    --color-cream:        #F8F5EE;   /* warm ivory         (was cream)       */
+    --color-cream-dark:   #EDE7D9;   /* deeper ivory       (was cream-dark)  */
+    --color-sand:         #BDD0B4;   /* sage green         (was sand)        */
+    --color-sand-dark:    #A8BF9E;   /* darker sage        (was sand-dark)   */
+    --color-sand-light:   #E4EDE0;   /* pale sage          (was sand-light)  */
+    --color-stone-border: #CDD9C6;   /* sage-tinted border (was warm grey)   */
+    --color-stone-muted:  #4A5E45;   /* sage muted text — darkened for WCAG AA contrast */
+
+    /* shadcn tokens */
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* ── Accent overrides: MUST be last inside @theme inline ─────── */
+    /* shadcn maps --color-accent → var(--accent) = #EDE7D9 (beige).  */
+    /* Redefining here after that mapping wins the cascade.            */
+    --color-accent:       #C4622A;
+    --color-accent-hover: #A8511F;
+}
+
+:root {
+    --background: #F8F5EE;
+    --foreground: #1A1A1A;
+    --card: #FFFFFF;
+    --card-foreground: #1A1A1A;
+    --popover: #FFFFFF;
+    --popover-foreground: #1A1A1A;
+    --primary: #1C3A28;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EDE7D9;
+    --secondary-foreground: #1A1A1A;
+    --muted: #EDE7D9;
+    --muted-foreground: #5A6B54;
+    --accent: #EDE7D9;
+    --accent-foreground: #1A1A1A;
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: #CDD9C6;
+    --input: #CDD9C6;
+    --ring: #1C3A28;
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.5rem;
+    --sidebar: #F8F5EE;
+    --sidebar-foreground: #1A1A1A;
+    --sidebar-primary: #1C3A28;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #EDE7D9;
+    --sidebar-accent-foreground: #1A1A1A;
+    --sidebar-border: #CDD9C6;
+    --sidebar-ring: #1C3A28;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-cream text-foreground;
+  }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+  a, button {
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  }
+}
+
+/* ── Skeleton shimmer ─────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #cdd9c6 22%,
+    #e8efe4 50%,
+    #cdd9c6 78%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: #d8e3d4;
+  }
+}
+
+/* Shimmer on dark surfaces (job detail hero, etc.) */
+.skeleton-inverse {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 20%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-inverse {
+    animation: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ── Page fade-up entrance ────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-up-delay-1 { animation-delay: 0.06s; }
+.animate-fade-up-delay-2 { animation-delay: 0.12s; }
+.animate-fade-up-delay-3 { animation-delay: 0.18s; }
+.animate-fade-up-delay-4 { animation-delay: 0.24s; }
+
+/* ── Solid surface helpers ────────────────────────────────────────── */
+.solid-surface {
+  background: #FFFFFF;
+  border: 1px solid #CDD9C6;
+  box-shadow: 0 1px 4px rgba(28, 58, 40, 0.06);
+}
+
+.solid-panel {
+  background: #F3F8F0;
+  border: 1px solid #CDD9C6;
+  box-shadow: 0 2px 8px rgba(28, 58, 40, 0.07);
+}
+
+.solid-card {
+  background: #FFFFFF;
+  border: 1px solid #CDD9C6;
+  box-shadow: 0 1px 4px rgba(28, 58, 40, 0.05);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.solid-card:hover {
+  border-color: rgba(28, 58, 40, 0.22);
+  box-shadow: 0 6px 20px rgba(28, 58, 40, 0.10);
+  transform: translateY(-2px);
+}
+
+/* ── Smooth state transitions ─────────────────────────────────────── */
+.solid-card,
+.solid-panel,
+.solid-surface {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
