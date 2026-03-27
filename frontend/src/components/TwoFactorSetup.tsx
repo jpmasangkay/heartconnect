@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Smartphone, Mail, CheckCircle } from 'lucide-react';
+import { Mail, CheckCircle } from 'lucide-react';
 import { twoFactorApi } from '../api';
 import { Input } from './ui/forms';
 import { Button } from './ui/button';
@@ -8,9 +8,6 @@ import { useAuth } from '../context/AuthContext';
 export default function TwoFactorSetup() {
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState<'choice' | 'totp-setup' | 'verify' | 'disable'>('choice');
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [secret, setSecret] = useState('');
-  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,20 +15,6 @@ export default function TwoFactorSetup() {
 
   const isEnabled = user?.twoFactorEnabled;
 
-  const handleSetupTOTP = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await twoFactorApi.setup('totp');
-      setQrCodeUrl(res.data.qrCodeUrl || '');
-      setSecret(res.data.secret || '');
-      setStep('totp-setup');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Setup failed');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSetupEmail = async () => {
     setError('');
@@ -47,32 +30,16 @@ export default function TwoFactorSetup() {
     }
   };
 
-  const handleVerifySetup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await twoFactorApi.verifySetup(code);
-      updateUser({ twoFactorEnabled: true, twoFactorMethod: 'totp' });
-      setSuccess('2FA enabled successfully!');
-      setStep('choice');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid code');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDisable = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await twoFactorApi.disable(password, code);
+      await twoFactorApi.disable(password, '');
       updateUser({ twoFactorEnabled: false, twoFactorMethod: undefined });
       setSuccess('2FA disabled');
       setStep('choice');
-      setCode('');
       setPassword('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to disable');
@@ -98,7 +65,7 @@ export default function TwoFactorSetup() {
           {isEnabled ? (
             <div>
               <p className="text-xs text-stone-muted mb-3">
-                2FA is <span className="text-green-600 font-medium">enabled</span> via {user?.twoFactorMethod === 'totp' ? 'authenticator app' : 'email'}.
+                2FA is <span className="text-green-600 font-medium">enabled</span> via email.
               </p>
               <Button
                 variant="outline"
@@ -114,14 +81,6 @@ export default function TwoFactorSetup() {
               </p>
               <div className="flex gap-2">
                 <Button
-                  variant="default"
-                  onClick={handleSetupTOTP}
-                  disabled={loading}
-                >
-                  <Smartphone size={14} className="mr-1.5" />
-                  Authenticator App
-                </Button>
-                <Button
                   variant="outline"
                   onClick={handleSetupEmail}
                   disabled={loading}
@@ -135,36 +94,6 @@ export default function TwoFactorSetup() {
         </div>
       )}
 
-      {step === 'totp-setup' && (
-        <div>
-          <p className="text-xs text-stone-muted mb-3">
-            Scan this QR code with your authenticator app (e.g. Google Authenticator):
-          </p>
-          {qrCodeUrl && (
-            <img src={qrCodeUrl} alt="QR code" className="w-48 h-48 mx-auto my-4 rounded border" />
-          )}
-          <p className="text-xs text-stone-muted mb-1">Or enter this secret manually:</p>
-          <code className="text-xs bg-cream-dark px-2 py-1 rounded block mb-4 break-all">{secret}</code>
-
-          <form onSubmit={handleVerifySetup}>
-            <Input
-              placeholder="Enter 6-digit code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              maxLength={6}
-              className="mb-3"
-            />
-            <div className="flex gap-2">
-              <Button type="submit" disabled={loading || code.length !== 6}>
-                {loading ? 'Verifying...' : 'Verify & Enable'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setStep('choice')}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {step === 'disable' && (
         <form onSubmit={handleDisable}>
@@ -176,15 +105,7 @@ export default function TwoFactorSetup() {
             onChange={(e) => setPassword(e.target.value)}
             className="mb-2"
           />
-          {user?.twoFactorMethod === 'totp' && (
-            <Input
-              placeholder="6-digit code from app"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              maxLength={6}
-              className="mb-3"
-            />
-          )}
+
           <div className="flex gap-2">
             <Button type="submit" variant="destructive" disabled={loading || !password}>
               {loading ? 'Disabling...' : 'Disable 2FA'}

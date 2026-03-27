@@ -113,9 +113,7 @@ export default function Login() {
               <div>
                 <h1 className="text-xl font-bold text-foreground">Two-Factor Authentication</h1>
                 <p className="text-xs text-stone-muted">
-                  {twoFactorMethod === 'totp'
-                    ? 'Enter the code from your authenticator app'
-                    : 'Enter the code sent to your email'}
+                  Enter the code sent to your email
                 </p>
               </div>
             </div>
