@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import axios from 'axios';
 import { Input, FormField } from '../components/ui/forms';
@@ -8,10 +8,11 @@ import { useAuth } from '../context/AuthContext';
 import { twoFactorApi } from '../api';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+  // ProtectedRoute sends `state.from` as a plain string (the pathname)
+  const from = (location.state as { from?: string })?.from || '/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +27,11 @@ export default function Login() {
   const [twoFactorMethod, setTwoFactorMethod] = useState<'totp' | 'email'>('totp');
   const [code, setCode] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
+
+  // If user is already authenticated, redirect away to avoid a loop
+  if (!isLoading && isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
