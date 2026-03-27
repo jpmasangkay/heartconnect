@@ -7,10 +7,10 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { Input, Textarea, FormField } from '../components/ui/forms';
 import { Button } from '../components/ui/button';
-import { authApi, verificationApi, reviewsApi } from '../api';
+import { authApi, verificationApi, reviewsApi, blocksApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import TwoFactorSetup from '../components/TwoFactorSetup';
-import type { Review } from '../types';
+import type { Review, User } from '../types';
 
 const AVAILABLE_SKILLS = [
   'React', 'Vue', 'Angular', 'TypeScript', 'JavaScript', 'Python', 'Node.js',
@@ -95,6 +95,34 @@ export default function Profile() {
   };
 
   const removeSkill = (s: string) => setSkills(skills.filter((x) => x !== s));
+
+  // Blocked Users state
+  const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
+
+  // Fetch blocked users
+  useEffect(() => {
+    if (!user?._id) return;
+    const ac = new AbortController();
+    setLoadingBlocked(true);
+    blocksApi.getAll({ signal: ac.signal })
+      .then((res) => {
+        setBlockedUsers(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingBlocked(false));
+    return () => ac.abort();
+  }, [user?._id]);
+
+  const handleUnblock = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to unblock this user?')) return;
+    try {
+      await blocksApi.unblock(userId);
+      setBlockedUsers(prev => prev.filter(u => u._id !== userId));
+    } catch {
+      // ignore
+    }
+  };
 
   // Verification state
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -330,10 +358,8 @@ export default function Profile() {
               )}
             </div>
           )}
-        </div>
-
-        {/* Skills card */}
-        <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
+          {/* Skills Section */}
+          <div className="mt-8 pt-6 border-t border-stone-border">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5">
             Skills
           </h3>
@@ -413,6 +439,7 @@ export default function Profile() {
               )}
             </>
           )}
+          </div>
         </div>
 
         {/* Reviews card */}
@@ -545,6 +572,44 @@ export default function Profile() {
               </h3>
               <TwoFactorSetup />
             </div>
+          </div>
+        )}
+
+        {/* Blocked Users card */}
+        {!editing && (
+          <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5 flex items-center gap-2">
+              <X size={14} />
+              Blocked Users
+            </h3>
+            
+            {loadingBlocked ? (
+              <p className="text-sm text-stone-muted">Loading...</p>
+            ) : blockedUsers.length === 0 ? (
+              <p className="text-sm text-stone-muted italic">You haven't blocked anyone.</p>
+            ) : (
+              <div className="space-y-3">
+                {blockedUsers.map(u => (
+                  <div key={u._id} className="flex items-center justify-between border-b border-stone-border pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{u.name}</p>
+                        <p className="text-xs text-stone-muted capitalize">{u.role}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnblock(u._id)}
+                      className="text-xs border border-stone-border hover:bg-cream px-3 py-1.5 rounded transition-colors text-foreground font-medium"
+                    >
+                      Unblock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

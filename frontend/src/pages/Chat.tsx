@@ -210,8 +210,10 @@ export default function Chat() {
           ? msg.conversation
           : String((msg.conversation as { _id?: string })?._id ?? msg.conversation);
 
+      const isActive = activeConv && String(activeConv._id) === String(convId);
+
       // Only append into the message pane if we're currently viewing this thread.
-      if (activeConv && String(activeConv._id) === String(convId)) {
+      if (isActive) {
         setMessages((prev) => {
           for (let i = 0; i < prev.length; i++) {
             if (prev[i]._id === msg._id) return prev;
@@ -226,9 +228,20 @@ export default function Chat() {
           );
           return [...filtered, msg];
         });
+        
+        // Immediately mark as read to clear the global unread badge
+        if (msg.sender._id !== user?._id) {
+          void messagesApi.markRead(convId).then(() => refreshUnread());
+        }
       }
 
-      setConversations((prev) => bumpConversationToFront(prev, convId, msg.createdAt));
+      setConversations((prev) => {
+        let list = bumpConversationToFront(prev, convId, msg.createdAt);
+        if (!isActive && msg.sender._id !== user?._id) {
+          list = list.map(c => String(c._id) === String(convId) ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c);
+        }
+        return list;
+      });
 
       // If this message belongs to a conversation not in our list yet, refetch once.
       if (!conversationsById.has(String(convId))) {

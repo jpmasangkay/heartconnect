@@ -74,15 +74,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [socket, isAuthenticated, refreshUnreadCount, refreshNotifications]);
 
   const markRead = useCallback(async (id: string) => {
-    await notificationsApi.markRead(id);
     setNotifications((prev) => prev.map((n) => n._id === id ? { ...n, read: true } : n));
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      await notificationsApi.markRead(id);
+    } catch {
+      // Silent fail
+    }
   }, []);
 
   const markAllRead = useCallback(async () => {
-    await notificationsApi.markAllRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
+    try {
+      await notificationsApi.markAllRead();
+    } catch {
+      // Silent fail
+    }
   }, []);
 
   return (
