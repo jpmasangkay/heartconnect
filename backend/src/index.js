@@ -46,6 +46,35 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '..', 'uploads')));
 
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// Comma-separated browser origins for the web app (Vite). Native apps often send no Origin.
+const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd) {
+  for (const u of clientUrls) {
+    if (!/^https:\/\//i.test(u)) {
+      logger.warn(`CLIENT_URL entry "${u}" should use https:// in production (TLS).`);
+    }
+  }
+}
+const corsOrigin = isProd
+  ? (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (clientUrls.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    }
+  : true;
+
+app.use(cors({
+  origin: corsOrigin,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+}));
+
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -78,37 +107,11 @@ app.use(generalLimiter);
 // ─── Audit Logging ────────────────────────────────────────────────────────────
 app.use(logSecurityEvent);
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
-// Comma-separated browser origins for the web app (Vite). Native apps often send no Origin.
-const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',')
-  .map((s) => s.trim().replace(/\/$/, ''))
-  .filter(Boolean);
-const isProd = process.env.NODE_ENV === 'production';
-if (isProd) {
-  for (const u of clientUrls) {
-    if (!/^https:\/\//i.test(u)) {
-      logger.warn(`CLIENT_URL entry "${u}" should use https:// in production (TLS).`);
-    }
-  }
-}
-const corsOrigin = isProd
-  ? (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (clientUrls.includes(origin)) return cb(null, true);
-      cb(new Error('Not allowed by CORS'));
-    }
-  : true;
-
-app.use(cors({
-  origin: corsOrigin,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
-}));
-
 // ─── REST Routes ──────────────────────────────────────────────────────────────
-app.use('/api/auth',           authLimiter, require('./routes/auth'));
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth/2fa',       require('./routes/twoFactor'));
 app.use('/api/jobs',           require('./routes/jobs'));
 app.use('/api/applications',   require('./routes/applications'));
