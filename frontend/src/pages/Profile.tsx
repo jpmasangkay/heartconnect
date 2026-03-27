@@ -502,7 +502,7 @@ export default function Profile() {
             ) : user.verificationStatus === 'rejected' ? (
               <div className="space-y-3">
                 <p className="text-sm text-red-500">Verification was rejected. You can try again.</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button variant="default" onClick={handleSchoolEmailVerify} disabled={verifyLoading}>
                     Verify with School Email
                   </Button>
@@ -520,7 +520,7 @@ export default function Profile() {
                 <p className="text-xs text-stone-muted">
                   Get a verified badge to build trust. Verify with your school email or upload your student ID.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button variant="default" onClick={handleSchoolEmailVerify} disabled={verifyLoading}>
                     Verify with School Email
                   </Button>

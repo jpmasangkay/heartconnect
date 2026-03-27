@@ -79,7 +79,7 @@ export default function TwoFactorSetup() {
               <p className="text-xs text-stone-muted mb-4">
                 Add an extra layer of security to your account.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   onClick={handleSetupEmail}
@@ -106,7 +106,7 @@ export default function TwoFactorSetup() {
             className="mb-2"
           />
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="destructive" disabled={loading || !password}>
               {loading ? 'Disabling...' : 'Disable 2FA'}
             </Button>
