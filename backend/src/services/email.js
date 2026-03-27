@@ -36,14 +36,14 @@ async function sendEmail(to, subject, html) {
   }
 
   try {
-    await t.sendMail({
+    t.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,
       subject,
       html,
-    });
+    }).catch(err => console.error('Email send async error:', err.message));
   } catch (err) {
-    console.error('Email send error:', err.message);
+    console.error('Email send setup error:', err.message);
   }
 }
 

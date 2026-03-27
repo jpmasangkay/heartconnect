@@ -16,7 +16,9 @@ const jobCreateSchema = z.object({
   budgetType: z.enum(['fixed', 'hourly']),
   deadline: z.string().refine((d) => {
     const ms = new Date(d).getTime();
-    return !Number.isNaN(ms) && ms > Date.now();
+    if (Number.isNaN(ms)) return false;
+    // Add 24 hours (minus 1ms) so the date-only string is treated as the end of that day UTC 
+    return (ms + 86399999) > Date.now();
   }, 'Deadline must be a valid future date'),
   skills: z.array(z.string().trim().min(1).max(50)).min(1, 'At least one skill is required'),
   locationType: z.enum(LOCATION_TYPES).optional().default('remote'),

@@ -280,11 +280,10 @@ export default function Profile() {
               )}
             </div>
           </div>
-        </div>
 
-        {/* Details card */}
-        <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5">
+          {/* Details Section */}
+          <div className="mt-8 pt-6 border-t border-stone-border">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5">
             Details
           </h3>
 
@@ -358,6 +357,7 @@ export default function Profile() {
               )}
             </div>
           )}
+          </div>
           {/* Skills Section */}
           <div className="mt-8 pt-6 border-t border-stone-border">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5">
@@ -508,6 +508,44 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Blocked Users card */}
+        {!editing && (
+          <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5 flex items-center gap-2">
+              <X size={14} />
+              Blocked Users
+            </h3>
+            
+            {loadingBlocked ? (
+              <p className="text-sm text-stone-muted">Loading...</p>
+            ) : blockedUsers.length === 0 ? (
+              <p className="text-sm text-stone-muted italic">You haven't blocked anyone.</p>
+            ) : (
+              <div className="space-y-3">
+                {blockedUsers.map(u => (
+                  <div key={u._id} className="flex items-center justify-between border-b border-stone-border pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{u.name}</p>
+                        <p className="text-xs text-stone-muted capitalize">{u.role}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnblock(u._id)}
+                      className="text-xs border border-stone-border hover:bg-cream px-3 py-1.5 rounded transition-colors text-foreground font-medium"
+                    >
+                      Unblock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Verification card */}
         {!editing && (
           <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
@@ -572,44 +610,6 @@ export default function Profile() {
               </h3>
               <TwoFactorSetup />
             </div>
-          </div>
-        )}
-
-        {/* Blocked Users card */}
-        {!editing && (
-          <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-muted mb-5 flex items-center gap-2">
-              <X size={14} />
-              Blocked Users
-            </h3>
-            
-            {loadingBlocked ? (
-              <p className="text-sm text-stone-muted">Loading...</p>
-            ) : blockedUsers.length === 0 ? (
-              <p className="text-sm text-stone-muted italic">You haven't blocked anyone.</p>
-            ) : (
-              <div className="space-y-3">
-                {blockedUsers.map(u => (
-                  <div key={u._id} className="flex items-center justify-between border-b border-stone-border pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center text-white text-xs font-bold shrink-0">
-                        {u.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{u.name}</p>
-                        <p className="text-xs text-stone-muted capitalize">{u.role}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleUnblock(u._id)}
-                      className="text-xs border border-stone-border hover:bg-cream px-3 py-1.5 rounded transition-colors text-foreground font-medium"
-                    >
-                      Unblock
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 

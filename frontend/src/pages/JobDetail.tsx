@@ -63,6 +63,7 @@ export default function JobDetail() {
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [proposedRate, setProposedRate] = useState('');
   const [formError, setFormError] = useState('');
@@ -198,6 +199,7 @@ export default function JobDetail() {
   };
 
   const handleStatusUpdate = async (appId: string, status: 'accepted' | 'rejected') => {
+    setActionLoading(`status-${appId}`);
     try {
       await applicationsApi.updateStatus(appId, status);
       setApplications((prev) => {
@@ -208,15 +210,18 @@ export default function JobDetail() {
         return next;
       });
     } catch { /* noop */ }
+    finally { setActionLoading(null); }
   };
 
   const handleMessage = async (applicantId: string) => {
+    setActionLoading(`message-${applicantId}`);
     try {
       const res = await messagesApi.getOrCreate(id!, applicantId);
       navigate(`/chat/${res.data._id}`, { state: { conversation: res.data } });
     } catch {
       navigate('/chat');
     }
+    finally { setActionLoading(null); }
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
@@ -421,23 +426,26 @@ export default function JobDetail() {
                             <>
                               <button
                                 onClick={() => handleStatusUpdate(app._id, 'accepted')}
-                                className="flex items-center gap-1.5 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg"
+                                disabled={actionLoading === `status-${app._id}`}
+                                className="flex items-center gap-1.5 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg disabled:opacity-50"
                               >
-                                <CheckCircle2 size={12} /> Accept
+                                <CheckCircle2 size={12} /> {actionLoading === `status-${app._id}` ? 'Accepting...' : 'Accept'}
                               </button>
                               <button
                                 onClick={() => handleStatusUpdate(app._id, 'rejected')}
-                                className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg"
+                                disabled={actionLoading === `status-${app._id}`}
+                                className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg disabled:opacity-50"
                               >
-                                <XCircle size={12} /> Reject
+                                <XCircle size={12} /> {actionLoading === `status-${app._id}` ? 'Rejecting...' : 'Reject'}
                               </button>
                             </>
                           )}
                           <button
                             onClick={() => handleMessage(app.applicant._id)}
-                            className="flex items-center gap-1.5 text-xs text-stone-muted hover:text-navy border border-stone-border px-3 py-1.5 rounded-lg"
+                            disabled={actionLoading === `message-${app.applicant._id}`}
+                            className="flex items-center gap-1.5 text-xs text-stone-muted hover:text-navy border border-stone-border px-3 py-1.5 rounded-lg disabled:opacity-50"
                           >
-                            <MessageSquare size={12} /> Message
+                            <MessageSquare size={12} /> {actionLoading === `message-${app.applicant._id}` ? 'Opening...' : 'Message'}
                           </button>
                         </div>
                       </div>
