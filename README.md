@@ -13,8 +13,10 @@ A full-stack freelancer job marketplace built for students — featuring real-ti
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![Socket.io](https://img.shields.io/badge/Socket.io-Realtime-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io)
 [![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://heartconnect-nine.vercel.app)
+[![Render](https://img.shields.io/badge/Backend_on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://heartconnect.onrender.com)
 
 🔗 **Live Demo:** [heartconnect-nine.vercel.app](https://heartconnect-nine.vercel.app)
+🖥️ **Backend API:** [heartconnect.onrender.com](https://heartconnect.onrender.com)
 
 ---
 
@@ -282,12 +284,23 @@ HeartConnect is built around a **role-driven, real-time architecture** connectin
 
 ## 🌐 Deployment
 
-HeartConnect's frontend is deployed on **Vercel**. Pushing to `master` triggers an automatic build and deployment.
+HeartConnect's frontend is deployed on **Vercel** and the backend is hosted on **Render**.
+
+| Service | URL |
+|---------|-----|
+| **Frontend (Vercel)** | [heartconnect-nine.vercel.app](https://heartconnect-nine.vercel.app) |
+| **Backend (Render)** | [heartconnect.onrender.com](https://heartconnect.onrender.com) |
+
+Pushing to `master` triggers an automatic build and deployment on Vercel.
 
 To deploy your own instance:
 1. Import the `client/` folder into [Vercel](https://vercel.com) as the project root
-2. Add all `VITE_*` environment variables in Vercel's **Environment Variables** settings
-3. Deploy the `server/` to your preferred Node.js host (Railway, Render, etc.) and point `VITE_API_URL` to it
+2. Add the following environment variables in Vercel's **Environment Variables** settings:
+   ```env
+   VITE_API_URL=https://heartconnect.onrender.com
+   VITE_SOCKET_URL=https://heartconnect.onrender.com
+   ```
+3. Deploy the `server/` to [Render](https://render.com) and configure your server-side environment variables there
 
 ---
 
