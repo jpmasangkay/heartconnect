@@ -299,4 +299,19 @@ export const blocksApi = {
     api.get<{ blocked: boolean }>(`/blocks/check/${userId}`),
 };
 
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+export const adminApi = {
+  getUsers: (params?: { search?: string; page?: number; limit?: number }) =>
+    api.get<{ data: User[]; total: number; pages: number; page: number }>(
+      '/admin/users', { params }
+    ),
+
+  banUser: (userId: string, reason?: string) =>
+    api.post(`/admin/ban/${userId}`, { reason }),
+
+  unbanUser: (userId: string) =>
+    api.post(`/admin/unban/${userId}`),
+};
+
 export default api;

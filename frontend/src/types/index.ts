@@ -24,6 +24,12 @@ export interface User {
   hasCompletedOnboarding?: boolean;
   // Blocking
   blockedUsers?: string[];
+  // Banning
+  isBanned?: boolean;
+  banReason?: string;
+  bannedAt?: string;
+  // Report tally (populated by admin endpoints)
+  reportTally?: { reviewed: number; pending: number };
   // Legal consent
   agreedToTerms?: boolean;
 }

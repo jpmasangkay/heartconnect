@@ -58,7 +58,8 @@ router.get('/', protect, adminAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/reports/:id — admin: resolve a report
+// PATCH /api/reports/:id — admin: resolve a report (auto-bans user on >= 3 valid reports)
+const AUTO_BAN_THRESHOLD = 3;
 router.patch('/:id', protect, adminAuth, async (req, res) => {
   try {
     const { action } = req.body; // 'reviewed' or 'dismissed'
@@ -74,9 +75,43 @@ router.patch('/:id', protect, adminAuth, async (req, res) => {
     report.resolvedAt = new Date();
     await report.save();
 
-    res.json(report);
+    // Auto-ban: count all reviewed (valid) reports against this user target
+    let autoBanned = false;
+    if (action === 'reviewed' && report.targetType === 'user') {
+      const User = require('../models/User');
+      const validCount = await Report.countDocuments({
+        targetType: 'user',
+        targetId: report.targetId,
+        status: 'reviewed',
+      });
+      if (validCount >= AUTO_BAN_THRESHOLD) {
+        await User.findByIdAndUpdate(report.targetId, {
+          isBanned: true,
+          banReason: `Auto-banned: ${validCount} valid reports`,
+          bannedAt: new Date(),
+        });
+        autoBanned = true;
+      }
+    }
+
+    res.json({ ...report.toObject(), autoBanned });
   } catch (err) {
     res.status(500).json({ message: 'Failed to resolve report' });
+  }
+});
+
+// GET /api/reports/tally/:userId — admin: get report counts per status for a user
+router.get('/tally/:userId', protect, adminAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const [pending, reviewed, dismissed] = await Promise.all([
+      Report.countDocuments({ targetType: 'user', targetId: userId, status: 'pending' }),
+      Report.countDocuments({ targetType: 'user', targetId: userId, status: 'reviewed' }),
+      Report.countDocuments({ targetType: 'user', targetId: userId, status: 'dismissed' }),
+    ]);
+    res.json({ pending, reviewed, dismissed, total: pending + reviewed + dismissed });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch tally' });
   }
 });
 

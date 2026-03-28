@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema({
   // Blocking
   blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
+  // Banning
+  isBanned:  { type: Boolean, default: false },
+  banReason: { type: String },
+  bannedAt:  { type: Date },
+
   // Legal consent
   agreedToTerms:   { type: Boolean, default: false },
   agreedToTermsAt: { type: Date },

@@ -122,6 +122,7 @@ app.use('/api/reviews',        require('./routes/reviews'));
 app.use('/api/verification',   require('./routes/verification'));
 app.use('/api/reports',        sensitiveWriteLimiter, require('./routes/reports'));
 app.use('/api/blocks',         require('./routes/blocks'));
+app.use('/api/admin',          require('./routes/admin'));
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 // ─── Global error handler ─────────────────────────────────────────────────────

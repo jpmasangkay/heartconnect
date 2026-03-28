@@ -11,6 +11,12 @@ module.exports = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await User.findById(decoded.id).select('-password');
     if (!req.user) return res.status(401).json({ message: 'User not found' });
+    if (req.user.isBanned) {
+      return res.status(403).json({
+        message: 'Your account has been banned.',
+        banReason: req.user.banReason || null,
+      });
+    }
     next();
   } catch {
     res.status(401).json({ message: 'Invalid token' });
