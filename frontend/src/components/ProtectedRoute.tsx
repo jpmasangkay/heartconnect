@@ -27,7 +27,11 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       navigate('/login', { state: { from: location.pathname }, replace: true });
     } else if (requiredRole && user?.role !== requiredRole) {
       didRedirect.current = true;
-      navigate('/dashboard', { replace: true });
+      const fallback = user?.role === 'admin' ? '/admin' : '/dashboard';
+      navigate(fallback, { replace: true });
+    } else if (!requiredRole && user?.role === 'admin' && location.pathname === '/dashboard') {
+      didRedirect.current = true;
+      navigate('/admin', { replace: true });
     }
   }, [isLoading, isAuthenticated, user?.role, requiredRole, navigate, location.pathname]);
 

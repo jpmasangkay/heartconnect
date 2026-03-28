@@ -92,7 +92,7 @@ export default function AdminDashboard() {
       <main className="max-w-4xl mx-auto w-full px-6 flex-1">
         <div className="pt-10 pb-6">
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Shield size={24} /> Admin Dashboard
+            <Shield size={24} /> Admin Center
           </h1>
           <p className="text-sm text-stone-muted mt-1">Manage verifications & reports</p>
         </div>

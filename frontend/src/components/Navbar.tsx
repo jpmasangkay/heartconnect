@@ -43,7 +43,7 @@ export default function Navbar() {
                     isActive('/admin') ? 'underline underline-offset-4' : 'hover:opacity-80'
                   }`}
                 >
-                  Admin Dashboard
+                  Admin Center
                 </Link>
               ) : (
                 /* ── Student / Client nav ── */
@@ -168,7 +168,7 @@ export default function Navbar() {
                   className="text-sm opacity-80 hover:opacity-100 flex items-center gap-2"
                 >
                   <Shield size={14} />
-                  Admin Dashboard
+                  Admin Center
                 </Link>
               ) : (
                 <>

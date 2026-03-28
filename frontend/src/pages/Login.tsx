@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { twoFactorApi } from '../api';
 
 export default function Login() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   // ProtectedRoute sends `state.from` as a plain string (the pathname)
@@ -30,7 +30,8 @@ export default function Login() {
 
   // If user is already authenticated, redirect away to avoid a loop
   if (!isLoading && isAuthenticated) {
-    return <Navigate to={from} replace />;
+    const dest = from === '/dashboard' && user?.role === 'admin' ? '/admin' : from;
+    return <Navigate to={dest} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +51,8 @@ export default function Login() {
         return;
       }
 
-      navigate(from, { replace: true });
+      const dest = from === '/dashboard' && result.user?.role === 'admin' ? '/admin' : from;
+      navigate(dest, { replace: true });
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const data = err.response?.data as { message?: string; errors?: string[] } | undefined;
