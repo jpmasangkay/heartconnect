@@ -1,17 +1,12 @@
 const { z } = require('zod');
 
 // ─── Job ──────────────────────────────────────────────────────────────────────
-const JOB_CATEGORIES = [
-  'Web Development','Graphic Design','Cybersecurity','Marketing',
-  'Data Science','Mobile Development','Content Writing','UI/UX Design','Other',
-];
 const JOB_STATUSES = ['open', 'closed', 'in-progress', 'completed'];
 const LOCATION_TYPES = ['remote', 'on-site', 'hybrid'];
 
 const jobCreateSchema = z.object({
   title: z.string().trim().min(5, 'Title must be 5-200 characters').max(200),
   description: z.string().trim().min(20, 'Description must be 20-10000 characters').max(10000),
-  category: z.enum(JOB_CATEGORIES).optional(),
   budget: z.number().positive('Budget must be positive').max(1000000, 'Budget max is 1,000,000'),
   budgetType: z.enum(['fixed', 'hourly']),
   deadline: z.string().refine((d) => {
@@ -27,7 +22,6 @@ const jobCreateSchema = z.object({
 const jobUpdateSchema = z.object({
   title: z.string().trim().min(5).max(200).optional(),
   description: z.string().trim().min(20).max(10000).optional(),
-  category: z.enum(JOB_CATEGORIES).optional(),
   budget: z.number().positive().max(1000000).optional(),
   budgetType: z.enum(['fixed', 'hourly']).optional(),
   deadline: z.string().refine((d) => !Number.isNaN(new Date(d).getTime()), 'Invalid deadline').optional(),
@@ -90,7 +84,6 @@ module.exports = {
   reviewSchema,
   validate,
   escapeRegex,
-  JOB_CATEGORIES,
   JOB_STATUSES,
   LOCATION_TYPES,
 };

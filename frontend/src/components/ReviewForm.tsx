@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Star } from 'lucide-react';
 import { reviewsApi } from '../api';
 import { Button } from './ui/button';
@@ -18,7 +18,7 @@ export default function ReviewForm({ jobId, jobTitle, revieweeId, revieweeName, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
       setError('Please select a rating');

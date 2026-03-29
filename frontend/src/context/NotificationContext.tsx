@@ -19,6 +19,7 @@ interface NotificationContextType {
   refreshUnreadCount: () => void;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
+  deleteAllRead: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
@@ -93,9 +94,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const deleteAllRead = useCallback(async () => {
+    setNotifications((prev) => prev.filter((n) => !n.read));
+    try {
+      await notificationsApi.deleteAllRead();
+    } catch {
+      // Silent fail
+    }
+  }, []);
+
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, loading, refreshNotifications, refreshUnreadCount, markRead, markAllRead }}
+      value={{ notifications, unreadCount, loading, refreshNotifications, refreshUnreadCount, markRead, markAllRead, deleteAllRead }}
     >
       {children}
     </NotificationContext.Provider>

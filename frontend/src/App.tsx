@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { useRef, useEffect, useState, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -50,7 +50,7 @@ function getBaseRoute(pathname: string) {
   return segments[0] || '';
 }
 
-function OnboardingGate({ children }: { children: React.ReactNode }) {
+function OnboardingGate({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
   const [dismissed, setDismissed] = useState(false);
 

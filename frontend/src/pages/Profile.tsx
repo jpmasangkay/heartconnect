@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Mail, MapPin, GraduationCap, Globe,
@@ -145,7 +145,7 @@ export default function Profile() {
     }
   };
 
-  const handleIdUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setVerifyLoading(true);

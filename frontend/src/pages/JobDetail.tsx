@@ -1,9 +1,8 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Clock, DollarSign, Users, CheckCircle2, XCircle, MessageSquare, Pencil, AlertCircle, ChevronLeft, Star, Flag } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { Input, Textarea, Badge, FormField } from '../components/ui/forms';
+import { Input, Textarea, Badge, FormField, type BadgeVariant } from '../components/ui/forms';
 import { jobsApi, applicationsApi, messagesApi, reviewsApi, reportsApi } from '../api';
 import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
@@ -11,46 +10,6 @@ import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import type { Job, Application, Review, ReportReason } from '../types';
-
-const MOCK_JOB: Job = {
-  _id: '1',
-  title: 'Build a React Landing Page',
-  description: `We need a clean, responsive landing page built in React with Tailwind CSS. The project involves:\n\n- Converting a Figma design to pixel-perfect React components\n- Mobile-first responsive layout\n- Smooth animations using Framer Motion\n- SEO optimization and performance best practices\n\nThe deliverable is a production-ready codebase with documentation.`,
-  category: 'Web Development',
-  budget: 5000,
-  budgetType: 'fixed',
-  deadline: new Date(Date.now() + 14 * 864e5).toISOString(),
-  skills: ['React', 'Tailwind CSS', 'Figma', 'TypeScript'],
-  status: 'open',
-  locationType: 'remote',
-  client: { _id: 'c1', name: 'Tech Startup PH', email: 'client@demo.com', role: 'client', createdAt: '' },
-  createdAt: new Date(Date.now() - 2 * 864e5).toISOString(),
-  updatedAt: '',
-  applicationsCount: 3,
-};
-
-const MOCK_APPLICATIONS: Application[] = [
-  {
-    _id: 'a1',
-    job: MOCK_JOB,
-    applicant: { _id: 's1', name: 'Ana Reyes', email: 'ana@up.edu.ph', role: 'student', university: 'UP Diliman', skills: ['React', 'TypeScript'], createdAt: '' },
-    coverLetter: 'I have 2 years of experience with React and Tailwind. I\'ve built several production sites and am confident I can deliver this on time.',
-    proposedRate: 4500,
-    status: 'pending',
-    createdAt: new Date(Date.now() - 864e5).toISOString(),
-    updatedAt: '',
-  },
-  {
-    _id: 'a2',
-    job: MOCK_JOB,
-    applicant: { _id: 's2', name: 'Jose Mendoza', email: 'jose@admu.edu.ph', role: 'student', university: 'Ateneo de Manila', skills: ['React', 'Next.js'], createdAt: '' },
-    coverLetter: 'Frontend dev with a focus on performance and accessibility. I\'ve converted 10+ Figma designs to React. Portfolio available on request.',
-    proposedRate: 5000,
-    status: 'pending',
-    createdAt: new Date(Date.now() - 2 * 864e5).toISOString(),
-    updatedAt: '',
-  },
-];
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +21,7 @@ export default function JobDetail() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [applying, setApplying] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
@@ -105,8 +65,7 @@ export default function JobDetail() {
         }
       } catch {
         if (signal.aborted) return;
-        setJob(MOCK_JOB);
-        if (user?.role === 'client') setApplications(MOCK_APPLICATIONS);
+        setLoadError(true);
       }
 
       // Fetch reviews for this job
@@ -181,7 +140,7 @@ export default function JobDetail() {
     };
   }, [socket, id]);
 
-  const handleApply = async (e: React.FormEvent) => {
+  const handleApply = async (e: FormEvent) => {
     e.preventDefault();
     if (!coverLetter.trim()) { setFormError('Cover letter is required'); return; }
     if (!proposedRate || Number(proposedRate) <= 0) { setFormError('Enter a valid proposed rate'); return; }
@@ -224,7 +183,7 @@ export default function JobDetail() {
     finally { setActionLoading(null); }
   };
 
-  const handleReviewSubmit = async (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!job || !user) return;
     setReviewSubmitting(true);
@@ -258,6 +217,14 @@ export default function JobDetail() {
       setReportDesc('');
     } catch { setReportMsg('Failed to submit report.'); }
   };
+
+  if (!loading && loadError) return (
+    <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-3 px-6">
+      <p className="text-foreground font-semibold">Failed to load job</p>
+      <p className="text-sm text-stone-muted">The job may have been removed or is unavailable.</p>
+      <Link to="/jobs" className="text-sm text-navy hover:underline mt-1">Browse all jobs</Link>
+    </div>
+  );
 
   if (!loading && !job) return null;
 
@@ -330,7 +297,7 @@ export default function JobDetail() {
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0 mt-1">
-              <Badge variant={job.status}>{job.status}</Badge>
+              <Badge variant={job.status as BadgeVariant}>{job.status}</Badge>
               {isOwner && (
                 <Link to={`/jobs/${job._id}/edit`} className="text-white/40 hover:text-white">
                   <Pencil size={14} />
@@ -415,7 +382,7 @@ export default function JobDetail() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-sm font-medium text-foreground">₱{app.proposedRate.toLocaleString()}</span>
-                            <Badge variant={app.status}>{app.status}</Badge>
+                            <Badge variant={app.status as BadgeVariant}>{app.status}</Badge>
                           </div>
                         </div>
                         <p className="text-sm text-stone-muted leading-relaxed line-clamp-3 mb-3">
@@ -546,7 +513,7 @@ export default function JobDetail() {
               <div className="bg-white border border-stone-border rounded-lg p-5">
                 {myApplication ? (
                   <div className="text-center">
-                    <Badge variant={myApplication.status} className="mb-2">
+                    <Badge variant={myApplication.status as BadgeVariant} className="mb-2">
                       {myApplication.status}
                     </Badge>
                     <p className="text-sm text-stone-muted mt-2">

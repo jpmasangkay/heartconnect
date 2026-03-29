@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -18,18 +17,18 @@ export default function JobBoard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 320);
-  const [category, setCategory] = useState('');
+  const [skill, setSkill] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
 
   useEffect(() => {
-    jobsApi.getCategories().then((res) => {
-      setCategories(res.data.categories ?? []);
-    }).catch(() => setCategories([]));
+    jobsApi.getSkills().then((res) => {
+      setAvailableSkills(res.data.categories ?? []);
+    }).catch(() => setAvailableSkills([]));
   }, []);
 
   const fetchJobs = useCallback(
@@ -41,7 +40,7 @@ export default function JobBoard() {
         const res = await jobsApi.getAll(
           {
             search: debouncedSearch || undefined,
-            category: category || undefined,
+            skill: skill || undefined,
             budgetMin: budgetMin ? Number(budgetMin) : undefined,
             budgetMax: budgetMax ? Number(budgetMax) : undefined,
             page,
@@ -70,7 +69,7 @@ export default function JobBoard() {
         if (!silent && !signal?.aborted) setLoading(false);
       }
     },
-    [debouncedSearch, category, budgetMin, budgetMax, page],
+    [debouncedSearch, skill, budgetMin, budgetMax, page],
   );
 
   useEffect(() => {
@@ -94,20 +93,20 @@ export default function JobBoard() {
     };
   }, [socket, fetchJobs]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     setPage(1);
   };
 
   const clearFilters = () => {
     setSearch('');
-    setCategory('');
+    setSkill('');
     setBudgetMin('');
     setBudgetMax('');
     setPage(1);
   };
 
-  const hasActiveFilters = !!(search || category || budgetMin || budgetMax);
+  const hasActiveFilters = !!(search || skill || budgetMin || budgetMax);
 
   return (
     <div className="min-h-screen bg-cream flex flex-col">
@@ -134,13 +133,13 @@ export default function JobBoard() {
             </div>
 
             <Select
-              value={category}
-              onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+              value={skill}
+              onChange={(e) => { setSkill(e.target.value); setPage(1); }}
               className="w-44 hidden sm:block"
             >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
+              <option value="">All skills</option>
+              {availableSkills.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </Select>
 
@@ -181,11 +180,11 @@ export default function JobBoard() {
                 />
               </div>
               <div className="sm:hidden flex flex-col gap-1 flex-1">
-                <label className="text-xs font-medium text-stone-muted">Category</label>
-                <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
-                  <option value="">All categories</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                <label className="text-xs font-medium text-stone-muted">Skill</label>
+                <Select value={skill} onChange={(e) => { setSkill(e.target.value); setPage(1); }}>
+                  <option value="">All skills</option>
+                  {availableSkills.map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </Select>
               </div>
@@ -203,10 +202,10 @@ export default function JobBoard() {
           {/* Active filter pills */}
           {hasActiveFilters && !showFilters && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {category && (
+              {skill && (
                 <span className="inline-flex items-center gap-1 text-xs bg-cream-dark text-foreground px-2.5 py-1 rounded-full">
-                  {category}
-                  <button onClick={() => { setCategory(''); setPage(1); }} className="text-stone-muted hover:text-foreground">
+                  {skill}
+                  <button onClick={() => { setSkill(''); setPage(1); }} className="text-stone-muted hover:text-foreground">
                     <X size={11} />
                   </button>
                 </span>

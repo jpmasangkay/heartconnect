@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Bookmark, BookmarkCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -6,25 +6,13 @@ import { savedJobsApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Job } from '../types';
 
-const CATEGORY_COLOR: Record<string, string> = {
-  'Web Development':    'bg-teal-50 text-teal-700',
-  'Graphic Design':     'bg-amber-50 text-amber-700',
-  'Cybersecurity':      'bg-emerald-50 text-emerald-700',
-  'Marketing':          'bg-orange-50 text-orange-700',
-  'Data Science':       'bg-violet-50 text-violet-700',
-  'Mobile Development': 'bg-sky-50 text-sky-700',
-  'Content Writing':    'bg-lime-50 text-lime-700',
-  'UI/UX Design':       'bg-rose-50 text-rose-700',
-  'Other':              'bg-stone-100 text-stone-600',
-};
-
 interface JobCardProps {
   job: Job;
 }
 
 export default function JobCard({ job }: JobCardProps) {
   const { isAuthenticated } = useAuth();
-  const colorClass = CATEGORY_COLOR[job.category] ?? CATEGORY_COLOR['Other'];
+  const firstSkill = job.skills[0] ?? null;
   const timeAgo = formatDistanceToNow(new Date(job.createdAt), { addSuffix: true });
   const deadlineDays = Math.ceil(
     (new Date(job.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -43,7 +31,7 @@ export default function JobCard({ job }: JobCardProps) {
     return () => { cancelled = true; };
   }, [job._id, isAuthenticated]);
 
-  const toggleSave = useCallback(async (e: React.MouseEvent) => {
+  const toggleSave = useCallback(async (e: MouseEvent) => {
     e.preventDefault(); // Don't navigate to job detail
     e.stopPropagation();
     if (toggling || !isAuthenticated) return;
@@ -81,12 +69,14 @@ export default function JobCard({ job }: JobCardProps) {
           </button>
         )}
 
-        {/* Category + time */}
+        {/* First skill + time */}
         <div className="flex items-center justify-between gap-2 mb-3 pr-8">
-          <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${colorClass}`}>
-            {job.category}
-          </span>
-          <span className="text-[11px] text-stone-muted">{timeAgo}</span>
+          {firstSkill && (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-cream-dark text-foreground border border-stone-border">
+              {firstSkill}
+            </span>
+          )}
+          <span className="text-[11px] text-stone-muted ml-auto">{timeAgo}</span>
         </div>
 
         {/* Title */}

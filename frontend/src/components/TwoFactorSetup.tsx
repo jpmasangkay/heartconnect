@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Mail, CheckCircle } from 'lucide-react';
 import { twoFactorApi } from '../api';
 import { Input } from './ui/forms';
@@ -31,7 +31,7 @@ export default function TwoFactorSetup() {
   };
 
 
-  const handleDisable = async (e: React.FormEvent) => {
+  const handleDisable = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);

@@ -1,5 +1,4 @@
-import React from 'react';
-import { useRef } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Shield, Palette, Megaphone, Code, BarChart2, Smartphone } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -62,7 +61,7 @@ function LazySection({
   delay = 0,
   translateY = 36,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   delay?: number;
   translateY?: number;
@@ -84,7 +83,7 @@ function LazySection({
   );
 }
 
-function LazyCard({ children, delay, className = '' }: { children: React.ReactNode; delay: number; className?: string }) {
+function LazyCard({ children, delay, className = '' }: { children: ReactNode; delay: number; className?: string }) {
   const [ref, inView] = useInView<HTMLDivElement>({ threshold: 0.1 });
   return (
     <div
@@ -104,7 +103,7 @@ function LazyCard({ children, delay, className = '' }: { children: React.ReactNo
 
 function StickyHero() {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const progress   = useStickyProgress(wrapperRef as React.RefObject<HTMLElement>);
+  const progress   = useStickyProgress(wrapperRef as RefObject<HTMLElement>);
   const scrollY    = useScrollY();
 
   const contentScale   = 1 - progress * 0.08;
@@ -223,7 +222,7 @@ export default function Landing() {
             return (
               <Link
                 key={cat.label}
-                to={`/jobs?category=${encodeURIComponent(cat.label)}`}
+                to={`/jobs?skill=${encodeURIComponent(cat.label)}`}
                 className="flex items-center gap-2 text-sm text-stone-muted hover:text-foreground bg-white border border-stone-border px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5"
               >
                 <Icon size={14} />

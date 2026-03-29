@@ -1,6 +1,4 @@
-import React from 'react';
-/// <reference types="vite/client" />
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Send, MessageSquare, ChevronLeft, Trash2, Paperclip, FileText, Image as ImageIcon, X, Check, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow, format, isToday } from 'date-fns';
@@ -363,7 +361,7 @@ export default function Chat() {
     );
   };
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !activeConv || !user) return;
     const content = input.trim();
@@ -407,7 +405,7 @@ export default function Chat() {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {

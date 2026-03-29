@@ -27,6 +27,11 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated]);
 
+  // Clear seen-message cache whenever the logged-in user changes to prevent cross-session accumulation
+  useEffect(() => {
+    seenMessageIdsRef.current.clear();
+  }, [user?._id]);
+
   // Initial fetch on auth change
   useEffect(() => {
     refreshUnread();

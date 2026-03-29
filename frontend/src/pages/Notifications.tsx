@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Footer from '../components/Footer';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function Notifications() {
-  const { notifications, loading, refreshNotifications, markRead, markAllRead } =
+  const { notifications, loading, refreshNotifications, markRead, markAllRead, deleteAllRead } =
     useNotifications();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -25,12 +25,23 @@ export default function Notifications() {
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Notifications</h1>
             <p className="text-sm text-stone-muted mt-1">Stay updated on your activity</p>
           </div>
-          <button
-            onClick={() => markAllRead()}
-            className="text-xs text-accent hover:text-accent-hover flex items-center gap-1"
-          >
-            <CheckCheck size={14} /> Mark all read
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => markAllRead()}
+              disabled={notifications.every((n) => n.read)}
+              className="text-xs text-accent hover:text-accent-hover flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <CheckCheck size={14} /> Mark all read
+            </button>
+            {notifications.some((n) => n.read) && (
+              <button
+                onClick={() => deleteAllRead()}
+                className="text-xs text-stone-muted hover:text-red-600 flex items-center gap-1 transition-colors"
+              >
+                <Trash2 size={14} /> Delete read
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Filter tabs */}

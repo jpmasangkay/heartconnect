@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { Shield, CheckCircle, XCircle, Flag, AlertTriangle, Users, Ban, Search } from 'lucide-react';
 import Footer from '../components/Footer';
 import { verificationApi, reportsApi, adminApi } from '../api';
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleManualVerify = async (e: React.FormEvent) => {
+  const handleManualVerify = async (e: FormEvent) => {
     e.preventDefault();
     setManualMsg('');
     if (!manualUserId.trim()) return;
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleManualBanById = async (e: React.FormEvent) => {
+  const handleManualBanById = async (e: FormEvent) => {
     e.preventDefault();
     setBanMsg('');
     if (!banUserId.trim()) return;

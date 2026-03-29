@@ -31,7 +31,7 @@ router.get('/categories', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const {
-      search, category, budgetMin, budgetMax, status,
+      search, skill, budgetMin, budgetMax, status,
       skills, deadlineBefore, deadlineAfter, locationType,
       page = 1, limit = 10,
     } = req.query;
@@ -54,9 +54,9 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    // Filter by skill (category = skill name)
-    if (category) {
-      query.skills = { $regex: new RegExp(`^${escapeRegex(category)}$`, 'i') };
+    // Filter by a single skill name
+    if (skill) {
+      query.skills = { $regex: new RegExp(`^${escapeRegex(skill)}$`, 'i') };
     }
 
     // Filter by multiple skills (comma-separated)
@@ -171,7 +171,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(400).json({ errors: validation.errors });
     }
 
-    const allowed = ['title', 'description', 'category', 'budget', 'budgetType', 'deadline', 'skills', 'status', 'locationType'];
+    const allowed = ['title', 'description', 'budget', 'budgetType', 'deadline', 'skills', 'status', 'locationType'];
     const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
     const updated = await Job.findByIdAndUpdate(req.params.id, updates, { new: true }).populate('client','name avatar');
     cache.del('job:categories');

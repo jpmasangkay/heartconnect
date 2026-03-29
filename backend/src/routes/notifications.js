@@ -60,4 +60,14 @@ router.patch('/read-all', protect, async (req, res) => {
   }
 });
 
+// DELETE /api/notifications/read  — delete all read notifications for the user
+router.delete('/read', protect, async (req, res) => {
+  try {
+    await Notification.deleteMany({ recipient: req.user._id, read: true });
+    res.json({ message: 'Read notifications deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete read notifications' });
+  }
+});
+
 module.exports = router;

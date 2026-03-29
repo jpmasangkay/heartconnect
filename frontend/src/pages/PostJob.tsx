@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, AlertCircle } from 'lucide-react';
 import { Input, Select, Textarea, FormField } from '../components/ui/forms';
@@ -28,7 +27,7 @@ export default function PostJob() {
 
   const removeSkill = (s: string) => setSkills(skills.filter((x) => x !== s));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     // Client-side validation (mirrors backend rules)

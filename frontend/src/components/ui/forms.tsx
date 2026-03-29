@@ -110,7 +110,7 @@ export const CardFooter = React.forwardRef<
 CardFooter.displayName = "CardFooter";
 
 // ─── Badge ─────────────────────────────────────────────────────────────────────
-type BadgeVariant = 'default' | 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'open' | 'closed' | 'completed' | 'finished' | 'in-progress';
+export type BadgeVariant = 'default' | 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'open' | 'closed' | 'completed' | 'finished' | 'in-progress';
 
 const badgeVariants: Record<BadgeVariant, string> = {
   default:   'bg-[#EDE7D9] text-[#3A4A35]',

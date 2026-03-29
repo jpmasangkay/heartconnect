@@ -131,7 +131,7 @@ export const jobsApi = {
   getMyJobs: (opts?: { signal?: AbortSignal }) =>
     api.get<Job[]>('/jobs/my', { signal: opts?.signal }),
 
-  getCategories: () => api.get<{ categories: string[] }>('/jobs/categories'),
+  getSkills: () => api.get<{ categories: string[] }>('/jobs/categories'),
 };
 
 // ─── Applications ─────────────────────────────────────────────────────────────
@@ -199,6 +199,8 @@ export const notificationsApi = {
   markRead: (id: string) => api.patch(`/notifications/${id}/read`),
 
   markAllRead: () => api.patch('/notifications/read-all'),
+
+  deleteAllRead: () => api.delete('/notifications/read'),
 };
 
 // ─── Saved Jobs ───────────────────────────────────────────────────────────────

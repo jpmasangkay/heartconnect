@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, GraduationCap, Briefcase } from 'lucide-react';
 import { Input, Label, FormField } from '../components/ui/forms';
@@ -32,7 +31,7 @@ export default function Register() {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     // Must match backend password policy (min 12, upper, lower, number, special char)
     if (password.length < 12) {

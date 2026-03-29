@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ChevronLeft, AlertCircle, Trash2 } from 'lucide-react';
 import { Input, Select, Textarea, FormField } from '../components/ui/forms';
@@ -7,7 +6,7 @@ import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { jobsApi } from '../api';
-import type { Job, JobStatus } from '../types';
+import type { JobStatus } from '../types';
 
 
 export default function EditJob() {
@@ -51,24 +50,7 @@ export default function EditJob() {
         setSkills(j.skills);
       } catch {
         if (signal.aborted) return;
-        const mockJob: Job = {
-          _id: id, title: 'Build a React Landing Page', description: 'We need a clean landing page.',
-          category: 'Web Development',
-          budget: 5000, budgetType: 'fixed',
-          deadline: new Date(Date.now() + 14 * 864e5).toISOString(),
-          skills: ['React', 'Tailwind'], status: 'open',
-          locationType: 'remote',
-          client: { _id: 'c1', name: 'Tech Startup PH', email: '', role: 'client', createdAt: '' },
-          createdAt: new Date().toISOString(), updatedAt: '',
-        };
-        setJob(mockJob);
-        setTitle(mockJob.title);
-        setDescription(mockJob.description);
-        setBudget(String(mockJob.budget));
-        setBudgetType(mockJob.budgetType);
-        setDeadline(mockJob.deadline.split('T')[0]);
-        setStatus(mockJob.status);
-        setSkills(mockJob.skills);
+        setError('Failed to load job. Please go back and try again.');
       }
       await waitMinSkeletonMs(t0, signal);
       if (signal.aborted) return;
@@ -89,7 +71,7 @@ export default function EditJob() {
 
   const removeSkill = (s: string) => setSkills(skills.filter((x) => x !== s));
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!title || !description || !budget || !deadline) {
       setError('Please fill in all required fields.');

@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import axios from 'axios';
@@ -34,7 +33,7 @@ export default function Login() {
     return <Navigate to={dest} replace />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitLockRef.current || loading) return;
     submitLockRef.current = true;
@@ -81,7 +80,7 @@ export default function Login() {
     }
   };
 
-  const handle2FAVerify = async (e: React.FormEvent) => {
+  const handle2FAVerify = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setCodeLoading(true);

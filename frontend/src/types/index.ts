@@ -66,23 +66,12 @@ export interface LoginResponse {
 
 // Job types
 export type JobStatus = 'open' | 'closed' | 'in-progress' | 'completed';
-export type JobCategory =
-  | 'Web Development'
-  | 'Graphic Design'
-  | 'Cybersecurity'
-  | 'Marketing'
-  | 'Data Science'
-  | 'Mobile Development'
-  | 'Content Writing'
-  | 'UI/UX Design'
-  | 'Other';
 export type LocationType = 'remote' | 'on-site' | 'hybrid';
 
 export interface Job {
   _id: string;
   title: string;
   description: string;
-  category: JobCategory;
   budget: number;
   budgetType: 'fixed' | 'hourly';
   deadline: string;
@@ -188,7 +177,7 @@ export interface PaginatedResponse<T> {
 // Filter types
 export interface JobFilters {
   search?: string;
-  category?: string;
+  skill?: string;
   skills?: string;
   budgetMin?: number;
   budgetMax?: number;

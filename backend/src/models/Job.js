@@ -3,12 +3,6 @@ const mongoose = require('mongoose');
 const jobSchema = new mongoose.Schema({
   title:       { type: String, required: true },
   description: { type: String, required: true },
-  category:    {
-    type: String,
-    enum: ['Web Development','Graphic Design','Cybersecurity','Marketing',
-           'Data Science','Mobile Development','Content Writing','UI/UX Design','Other'],
-    required: false,
-  },
   budget:       { type: Number, required: true },
   budgetType:   { type: String, enum: ['fixed', 'hourly'], default: 'fixed' },
   deadline:     { type: Date, required: true },
@@ -28,7 +22,6 @@ jobSchema.index({ client: 1, createdAt: -1 });
 jobSchema.index({ budget: 1 });
 jobSchema.index({ deadline: 1 });
 jobSchema.index({ locationType: 1 });
-jobSchema.index({ category: 1 });
 jobSchema.index({ title: 'text', description: 'text' });
 
 module.exports = mongoose.model('Job', jobSchema);

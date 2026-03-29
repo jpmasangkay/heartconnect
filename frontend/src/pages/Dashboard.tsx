@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus, CheckCircle2, ArrowRight, MessageSquare,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Badge } from '../components/ui/forms';
+import { Badge, type BadgeVariant } from '../components/ui/forms';
 import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { jobsApi, applicationsApi } from '../api';
@@ -169,8 +169,6 @@ function StudentDashboard({ user }: { user: any }) {
                           </Link>
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-stone-muted">
-                          <span>{job.category}</span>
-                          <span className="text-stone-border">·</span>
                           <span>₱{app.proposedRate.toLocaleString()}</span>
                           <span className="text-stone-border">·</span>
                           <span>{formatDistanceToNow(new Date(app.createdAt), { addSuffix: true })}</span>
@@ -182,7 +180,7 @@ function StudentDashboard({ user }: { user: any }) {
                             <MessageSquare size={12} /> Chat
                           </Link>
                         )}
-                        <Badge variant={app.status}>{app.status}</Badge>
+                        <Badge variant={app.status as BadgeVariant}>{app.status}</Badge>
                       </div>
                     </div>
                   );
@@ -300,7 +298,7 @@ function ClientDashboard({ user }: { user: any }) {
               </span>
               <span className="inline-flex items-center gap-2 bg-cream-dark/50 border border-stone-border px-3 py-1.5 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-navy/60" aria-hidden />
-                <span className="text-stone-muted">In progress</span>
+                <span className="text-stone-muted">Closed</span>
                 <span className="font-semibold text-foreground tabular-nums">{closed.length}</span>
               </span>
               <span className="inline-flex items-center gap-2 bg-cream-dark/30 border border-stone-border px-3 py-1.5 rounded-full">
@@ -395,7 +393,7 @@ function ClientDashboard({ user }: { user: any }) {
                 <section className="w-full">
                   <div className="w-full pb-3 border-b border-stone-border">
                     <h2 className="text-sm font-semibold text-stone-muted inline-flex items-center gap-2">
-                      In progress
+                      Closed
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-cream-dark/70 border border-stone-border text-[11px] font-bold text-foreground tabular-nums">
                         {closed.length}
                       </span>
@@ -468,7 +466,7 @@ function JobRow({
 }: {
   job: Job;
   muted?: boolean;
-  children?: React.ReactNode;
+  children?: ReactNode;
   onClose?: (id: string) => void;
 }) {
   const apps = job.applicationsCount ?? 0;
@@ -483,8 +481,6 @@ function JobRow({
             {job.title}
           </Link>
           <div className="flex items-center gap-2 mt-1 text-xs text-stone-muted">
-            <span>{job.category}</span>
-            <span className="text-stone-border">·</span>
             <span>₱{job.budget.toLocaleString()} {job.budgetType}</span>
             <span className="text-stone-border">·</span>
             <span className={apps > 0 ? 'text-[#1C3A28] font-medium' : ''}>
@@ -492,7 +488,7 @@ function JobRow({
             </span>
           </div>
         </div>
-        <Badge variant={job.status}>{job.status}</Badge>
+        <Badge variant={job.status as BadgeVariant}>{job.status}</Badge>
       </div>
       {children && (
         <div className="flex items-center gap-3 pt-4 mt-4 border-t border-stone-border/60">
