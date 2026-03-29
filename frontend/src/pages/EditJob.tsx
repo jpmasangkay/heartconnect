@@ -6,7 +6,7 @@ import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { jobsApi } from '../api';
-import type { JobStatus } from '../types';
+import type { Job, JobStatus } from '../types';
 
 
 export default function EditJob() {
