@@ -6,10 +6,18 @@ const protect = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
 
 const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+  jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '7d',
+    issuer: 'heartconnect',
+    audience: 'heartconnect-api',
+  });
 
 const signTempToken = (id) =>
-  jwt.sign({ id, requires2FA: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  jwt.sign({ id, requires2FA: true }, process.env.JWT_SECRET, {
+    expiresIn: '5m',
+    issuer: 'heartconnect',
+    audience: 'heartconnect-api',
+  });
 
 // Password complexity validation
 const validatePasswordStrength = (password) => {
@@ -44,6 +52,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'You must agree to the Terms of Service and Privacy Policy' });
     }
     
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+
     // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
@@ -125,7 +137,8 @@ router.post('/login', async (req, res) => {
       // If email 2FA, auto-send the code
       if (user.twoFactorMethod === 'email') {
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        user._email2FACode = code;
+        user._email2FACode = crypto.createHash('sha256').update(code).digest('hex');
+        user._email2FACodeExpires = new Date(Date.now() + 5 * 60 * 1000);
         await user.save();
         await sendEmail(
           user.email,

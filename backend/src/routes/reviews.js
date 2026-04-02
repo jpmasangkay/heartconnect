@@ -1,4 +1,5 @@
 const router      = require('express').Router();
+const mongoose    = require('mongoose');
 const Review      = require('../models/Review');
 const Job         = require('../models/Job');
 const Application = require('../models/Application');
@@ -91,11 +92,12 @@ router.get('/user/:userId', async (req, res) => {
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit);
 
-    // Calculate average rating across ALL reviews (not just this page)
-    const allReviews = await Review.find(query, 'rating');
-    const avgRating = allReviews.length > 0
-      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
-      : 0;
+    // Calculate average rating via aggregation (efficient, no full document load)
+    const [aggResult] = await Review.aggregate([
+      { $match: { reviewee: new mongoose.Types.ObjectId(req.params.userId) } },
+      { $group: { _id: null, avgRating: { $avg: '$rating' } } },
+    ]);
+    const avgRating = aggResult ? Math.round(aggResult.avgRating * 10) / 10 : 0;
 
     res.json({
       data: reviews,

@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema({
   twoFactorSecret:  { type: String },
   twoFactorMethod:  { type: String, enum: ['totp', 'email'] },
   _email2FACode:    { type: String, select: false },
+  _email2FACodeExpires: { type: Date, select: false },
 
   // Verification
   isVerified:         { type: Boolean, default: false },

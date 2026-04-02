@@ -141,10 +141,10 @@ export const applicationsApi = {
     api.post<Application>(`/jobs/${jobId}/applications`, data),
 
   getForJob: (jobId: string, opts?: { signal?: AbortSignal }) =>
-    api.get<Application[]>(`/jobs/${jobId}/applications`, { signal: opts?.signal }),
+    api.get<{ data: Application[]; total: number; pages: number; page: number }>(`/jobs/${jobId}/applications`, { signal: opts?.signal }),
 
   getMyApplications: (opts?: { signal?: AbortSignal }) =>
-    api.get<Application[]>('/applications/my', { signal: opts?.signal }),
+    api.get<{ data: Application[]; total: number; pages: number; page: number }>('/applications/my', { signal: opts?.signal }),
 
   updateStatus: (id: string, status: ApplicationStatus) =>
     api.patch<Application>(`/applications/${id}/status`, { status }),

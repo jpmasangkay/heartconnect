@@ -13,6 +13,7 @@ const messageSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 messageSchema.index({ conversation: 1, createdAt: 1 });
+messageSchema.index({ conversation: 1, sender: 1, read: 1 });
 
 const conversationSchema = new mongoose.Schema({
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

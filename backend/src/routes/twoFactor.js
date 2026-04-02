@@ -7,7 +7,11 @@ const jwt     = require('jsonwebtoken');
 const { sendEmail } = require('../services/email');
 
 const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+  jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '7d',
+    issuer: 'heartconnect',
+    audience: 'heartconnect-api',
+  });
 
 // POST /api/auth/2fa/setup  — generate secret + QR code
 router.post('/setup', protect, async (req, res) => {
@@ -74,7 +78,7 @@ router.post('/verify', async (req, res) => {
     // Decode temp token (short-lived, 5 min)
     let decoded;
     try {
-      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET, { issuer: 'heartconnect', audience: 'heartconnect-api' });
     } catch {
       return res.status(401).json({ message: 'Session expired. Please login again.' });
     }
@@ -83,7 +87,7 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Invalid token' });
     }
 
-    const user = await User.findById(decoded.id).select('+_email2FACode');
+    const user = await User.findById(decoded.id).select('+_email2FACode +_email2FACodeExpires');
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ message: 'Invalid request' });
     }
@@ -94,12 +98,14 @@ router.post('/verify', async (req, res) => {
         return res.status(400).json({ message: 'Invalid verification code' });
       }
     } else if (user.twoFactorMethod === 'email') {
-      // For email 2FA, validate with the stored temp code
-      if (!user._email2FACode || user._email2FACode !== code) {
-        return res.status(400).json({ message: 'Invalid verification code' });
+      // For email 2FA, validate with the stored temp code (hashed)
+      const hashedInput = require('crypto').createHash('sha256').update(code).digest('hex');
+      if (!user._email2FACode || !user._email2FACodeExpires || user._email2FACodeExpires < new Date() || user._email2FACode !== hashedInput) {
+        return res.status(400).json({ message: 'Invalid or expired verification code' });
       }
       // Clear used code
       user._email2FACode = undefined;
+      user._email2FACodeExpires = undefined;
       await user.save();
     }
 
@@ -145,7 +151,7 @@ router.post('/send-email-code', async (req, res) => {
     const { tempToken } = req.body;
     let decoded;
     try {
-      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET, { issuer: 'heartconnect', audience: 'heartconnect-api' });
     } catch {
       return res.status(401).json({ message: 'Session expired' });
     }
@@ -157,7 +163,8 @@ router.post('/send-email-code', async (req, res) => {
 
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    user._email2FACode = code;
+    user._email2FACode = require('crypto').createHash('sha256').update(code).digest('hex');
+    user._email2FACodeExpires = new Date(Date.now() + 5 * 60 * 1000);
     await user.save();
 
     await sendEmail(

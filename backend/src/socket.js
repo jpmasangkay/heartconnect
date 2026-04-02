@@ -23,7 +23,7 @@ function setupSocket(server, opts = {}) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('Authentication error'));
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { issuer: 'heartconnect', audience: 'heartconnect-api' });
       socket.userId = decoded.id;
       next();
     } catch (err) {
@@ -38,6 +38,15 @@ function setupSocket(server, opts = {}) {
 
   function isSocketRateLimited(socketId) {
     const now = Date.now();
+    // Safety: clean all if map exceeds 10k entries
+    if (socketEventCounts.size > 10000) {
+      const cutoff = now - SOCKET_RATE_WINDOW;
+      for (const [sid, events] of socketEventCounts) {
+        const fresh = events.filter((t) => t > cutoff);
+        if (fresh.length === 0) socketEventCounts.delete(sid);
+        else socketEventCounts.set(sid, fresh);
+      }
+    }
     if (!socketEventCounts.has(socketId)) {
       socketEventCounts.set(socketId, []);
     }
@@ -69,7 +78,7 @@ function setupSocket(server, opts = {}) {
 
     // Mark online
     onlineUsers.add(socket.userId);
-    io.emit('user:online', { userId: socket.userId });
+    // Presence is queried on-demand via 'get_online_status' — no global broadcast.
 
     // Join a conversation room
     socket.on('join_room', (conversationId) => {
@@ -136,8 +145,7 @@ function setupSocket(server, opts = {}) {
         if (convo.hiddenFor?.length) convo.hiddenFor = [];
         await convo.save();
 
-        // Broadcast
-        io.to(convId).emit('receive_message', msg);
+        // Broadcast to participant user rooms only
         for (const pid of convo.participants) {
           io.to(`user:${String(pid)}`).emit('receive_message', msg);
         }
@@ -164,7 +172,7 @@ function setupSocket(server, opts = {}) {
         onlineUsers.delete(socket.userId);
         // Persist lastSeen
         User.findByIdAndUpdate(socket.userId, { lastSeen: new Date() }).catch(() => {});
-        io.emit('user:offline', { userId: socket.userId, lastSeen: new Date() });
+        // Presence is queried on-demand via 'get_online_status' — no global broadcast.
       }
     });
   });

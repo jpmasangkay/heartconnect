@@ -3,6 +3,7 @@ const User     = require('../models/User');
 const Report   = require('../models/Report');
 const protect  = require('../middleware/auth');
 const adminAuth = require('../middleware/adminAuth');
+const { escapeRegex } = require('../middleware/schemas');
 
 // GET /api/admin/users — list all users with ban status + report tally
 router.get('/users', protect, adminAuth, async (req, res) => {
@@ -11,8 +12,9 @@ router.get('/users', protect, adminAuth, async (req, res) => {
     const safePage  = Math.max(1, Math.min(Number(page)  || 1,  1000));
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
 
-    const query = search
-      ? { $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }] }
+    const escaped = escapeRegex(search);
+    const query = escaped
+      ? { $or: [{ name: new RegExp(escaped, 'i') }, { email: new RegExp(escaped, 'i') }] }
       : {};
 
     const total = await User.countDocuments(query);

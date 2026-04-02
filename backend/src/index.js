@@ -9,13 +9,14 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-const express    = require('express');
-const http       = require('http');
-const path       = require('path');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
-const mongoose   = require('mongoose');
+const express     = require('express');
+const http        = require('http');
+const path        = require('path');
+const cors        = require('cors');
+const helmet      = require('helmet');
+const compression = require('compression');
+const rateLimit   = require('express-rate-limit');
+const mongoose    = require('mongoose');
 const requestId  = require('./middleware/requestId');
 const monitor    = require('./middleware/monitor');
 const logger     = require('./services/logger');
@@ -25,14 +26,29 @@ const { setupSocket } = require('./socket');
 const app    = express();
 const server = http.createServer(app);
 
+// Trust first proxy (Render, Vercel, etc.) so rate-limiter reads the real client IP
+app.set('trust proxy', 1);
+
 // ─── Request ID & Monitoring ──────────────────────────────────────────────────
 app.use(requestId);
 app.use(monitor);
 
+// ─── Compression ──────────────────────────────────────────────────────────────
+app.use(compression());
+
 // ─── Security Middleware ──────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "wss:", "ws:", "https:"],
+    },
+  },
 }));
 
 // Limit payload size to prevent DoS
@@ -111,6 +127,7 @@ app.use(logSecurityEvent);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth/2fa/verify', authLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth/2fa',       require('./routes/twoFactor'));
 app.use('/api/jobs',           require('./routes/jobs'));
@@ -164,6 +181,12 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     logger.info('MongoDB connected');
+    mongoose.connection.on('error', (err) => {
+      logger.error('MongoDB connection error', { error: err.message });
+    });
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected. Attempting to reconnect…');
+    });
     server.listen(PORT, '0.0.0.0', () => {
       logger.info(`Server listening on port ${PORT} (bind 0.0.0.0). Point clients via env (no hardcoded IPs).`);
     });
@@ -172,3 +195,20 @@ mongoose
     logger.error('MongoDB connection failed', { error: err.message });
     process.exit(1);
   });
+
+// ─── Graceful Shutdown ────────────────────────────────────────────────────────
+const gracefulShutdown = async (signal) => {
+  logger.info(`${signal} received. Shutting down gracefully…`);
+  io.close();
+  server.close(() => {
+    mongoose.connection.close(false).then(() => {
+      logger.info('MongoDB connection closed.');
+      process.exit(0);
+    });
+  });
+  // Force exit after 10s if graceful shutdown fails
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

@@ -305,14 +305,6 @@ export default function Chat() {
     socket.on('conversation:hidden', handleConvoHidden);
     socket.on('conversation:new', handleConversationNew);
 
-    // Online presence
-    const handleUserOnline = ({ userId }: { userId: string }) => {
-      setOnlineUsers((prev) => { const next = new Set(prev); next.add(userId); return next; });
-    };
-    const handleUserOffline = ({ userId, lastSeen }: { userId: string; lastSeen: string }) => {
-      setOnlineUsers((prev) => { const next = new Set(prev); next.delete(userId); return next; });
-      if (lastSeen) setLastSeenMap((prev) => { const next = new Map(prev); next.set(userId, lastSeen); return next; });
-    };
     // Messages read by the other person → update our messages as "read"
     const handleMessagesRead = ({ conversationId }: { conversationId: string }) => {
       if (activeConv && String(activeConv._id) === conversationId) {
@@ -320,8 +312,6 @@ export default function Chat() {
       }
     };
 
-    socket.on('user:online', handleUserOnline);
-    socket.on('user:offline', handleUserOffline);
     socket.on('messages:read', handleMessagesRead);
 
     return () => {
@@ -331,11 +321,52 @@ export default function Chat() {
       socket.off('conversation:deleted', handleConvoDeleted);
       socket.off('conversation:hidden', handleConvoHidden);
       socket.off('conversation:new', handleConversationNew);
-      socket.off('user:online', handleUserOnline);
-      socket.off('user:offline', handleUserOffline);
       socket.off('messages:read', handleMessagesRead);
     };
   }, [socket, user?._id, navigate, refreshUnread, activeConv, conversationsById]);
+
+  // Stable key of other-participant IDs so presence polling only re-runs when the
+  // set of chat partners actually changes (not on every message / unread bump).
+  const otherParticipantIdsKey = useMemo(() => {
+    if (!user) return '';
+    const ids: string[] = [];
+    for (const conv of conversations) {
+      const other = conv.participants?.find((p) => p._id !== user._id);
+      if (other?._id && !ids.includes(other._id)) ids.push(other._id);
+    }
+    return ids.sort().join(',');
+  }, [conversations, user]);
+
+  // On-demand online-presence polling via get_online_status (replaces removed user:online/user:offline broadcasts)
+  useEffect(() => {
+    if (!socket || !otherParticipantIdsKey) return;
+
+    const otherIds = otherParticipantIdsKey.split(',');
+
+    const queryAll = () => {
+      for (const uid of otherIds) {
+        socket.emit('get_online_status', uid, (res: { online: boolean; lastSeen: string | null }) => {
+          if (res.online) {
+            setOnlineUsers((prev) => { if (prev.has(uid)) return prev; const next = new Set(prev); next.add(uid); return next; });
+          } else {
+            setOnlineUsers((prev) => { if (!prev.has(uid)) return prev; const next = new Set(prev); next.delete(uid); return next; });
+          }
+          if (res.lastSeen) {
+            setLastSeenMap((prev) => { if (prev.get(uid) === res.lastSeen) return prev; const next = new Map(prev); next.set(uid, res.lastSeen!); return next; });
+          }
+        });
+      }
+    };
+
+    queryAll();
+    const interval = setInterval(queryAll, 60_000); // Refresh every 60 s
+    // Also re-query on reconnect
+    socket.on('connect', queryAll);
+    return () => {
+      clearInterval(interval);
+      socket.off('connect', queryAll);
+    };
+  }, [socket, otherParticipantIdsKey]);
 
   // Join room when active conv changes; re-join after reconnect (rooms are not preserved)
   useEffect(() => {

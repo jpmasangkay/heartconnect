@@ -25,7 +25,9 @@ router.get('/', protect, async (req, res) => {
       .limit(safeLimit);
     // Filter out deleted jobs and closed/completed ones
     const data = saved.filter((s) => s.job != null && !['closed', 'completed'].includes(s.job.status));
-    res.json({ data, total, pages: Math.ceil(total / safeLimit), page: safePage });
+    // Use filtered count for accurate pagination
+    const filteredTotal = data.length;
+    res.json({ data, total: filteredTotal, pages: Math.ceil(filteredTotal / safeLimit), page: safePage });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch saved jobs' });
   }

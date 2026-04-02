@@ -29,6 +29,16 @@ function checkSpam(userId, content) {
   const now = Date.now();
   const uid = String(userId);
 
+  // Safety cap: if map is too large, trim oldest entries
+  if (recentMessages.size > 10000) {
+    const cutoff = now - FLOOD_WINDOW_MS;
+    for (const [id, entries] of recentMessages) {
+      const fresh = entries.filter((e) => e.ts > cutoff);
+      if (fresh.length === 0) recentMessages.delete(id);
+      else recentMessages.set(id, fresh);
+    }
+  }
+
   if (!recentMessages.has(uid)) recentMessages.set(uid, []);
   const history = recentMessages.get(uid);
 

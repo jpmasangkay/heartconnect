@@ -3,7 +3,7 @@ const Job         = require('../models/Job');
 const Application = require('../models/Application');
 const Notification = require('../models/Notification');
 const protect     = require('../middleware/auth');
-const { validateJobInput, escapeRegex } = require('../middleware/validation');
+const { validateJobInput, validateApplicationInput, escapeRegex } = require('../middleware/validation');
 const cache       = require('../services/cache');
 
 // GET /api/jobs/categories  — returns unique skills from all open jobs (no duplicates)
@@ -12,7 +12,7 @@ router.get('/categories', async (req, res) => {
     const cached = cache.get('job:categories');
     if (cached) return res.json(cached);
 
-    const jobs = await Job.find({ status: 'open' }, 'skills');
+    const jobs = await Job.find({ status: 'open' }, 'skills').lean();
     const skillSet = new Set();
     jobs.forEach((job) => {
       (job.skills || []).forEach((skill) => {
@@ -101,7 +101,8 @@ router.get('/', async (req, res) => {
       .populate('applicationsCount')
       .sort({ createdAt: -1 })
       .skip((safePage - 1) * safeLimit)
-      .limit(safeLimit);
+      .limit(safeLimit)
+      .lean();
 
     res.json({ data: jobs, total, pages: Math.ceil(total / safeLimit), page: safePage });
   } catch (err) {
@@ -114,7 +115,8 @@ router.get('/my', protect, async (req, res) => {
   try {
     const jobs = await Job.find({ client: req.user._id })
       .populate('applicationsCount')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch jobs' });
@@ -145,13 +147,17 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ errors: validation.errors });
     }
 
+    const allowed = ['title', 'description', 'budget', 'budgetType', 'deadline', 'skills', 'locationType'];
+    const safeData = Object.fromEntries(
+      Object.entries(req.body).filter(([k]) => allowed.includes(k))
+    );
     const job = await Job.create({
-      ...req.body,
+      ...safeData,
       client: req.user._id,
     });
     await job.populate('client', 'name avatar');
     cache.del('job:categories'); // invalidate categories cache
-    req.app.locals.io.emit('job:created', job);
+    req.app.locals.io.emit('job:created', { _id: job._id });
     res.status(201).json(job);
   } catch (err) {
     res.status(400).json({ message: 'Failed to create job' });
@@ -175,7 +181,7 @@ router.put('/:id', protect, async (req, res) => {
     const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
     const updated = await Job.findByIdAndUpdate(req.params.id, updates, { new: true }).populate('client','name avatar');
     cache.del('job:categories');
-    req.app.locals.io.emit('job:updated', updated);
+    req.app.locals.io.emit('job:updated', { _id: updated._id, status: updated.status });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -298,6 +304,11 @@ router.post('/:id/applications', protect, async (req, res) => {
   try {
     if (req.user.role !== 'student')
       return res.status(403).json({ message: 'Only students can apply' });
+
+    const validation = validateApplicationInput(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ errors: validation.errors });
+    }
 
     const job = await Job.findById(req.params.id);
     if (!job || job.status !== 'open')

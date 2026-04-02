@@ -30,12 +30,16 @@ router.get('/', protect, async (req, res) => {
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit);
 
-    // Attach unread count per conversation
-    const data = await Promise.all(convos.map(async (c) => {
-      const unreadCount = await Message.countDocuments({
-        conversation: c._id, sender: { $ne: req.user._id }, read: false,
-      });
-      return { ...c.toObject(), unreadCount };
+    // Single aggregation for all unread counts (replaces N+1 queries)
+    const convoIds = convos.map((c) => c._id);
+    const unreadCounts = await Message.aggregate([
+      { $match: { conversation: { $in: convoIds }, sender: { $ne: req.user._id }, read: false } },
+      { $group: { _id: '$conversation', count: { $sum: 1 } } },
+    ]);
+    const unreadMap = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
+    const data = convos.map((c) => ({
+      ...c.toObject(),
+      unreadCount: unreadMap.get(c._id.toString()) || 0,
     }));
 
     res.json({ data, total, pages: Math.ceil(total / safeLimit), page: safePage });
@@ -47,14 +51,23 @@ router.get('/', protect, async (req, res) => {
 // GET /api/conversations/unread
 router.get('/unread', protect, async (req, res) => {
   try {
-    const myConvos = await Conversation.find(
-      { participants: req.user._id, hiddenFor: { $nin: [req.user._id] } },
-      '_id',
-    );
-    const ids = myConvos.map((c) => c._id);
-    const count = await Message.countDocuments({
-      conversation: { $in: ids }, sender: { $ne: req.user._id }, read: false,
-    });
+    const result = await Conversation.aggregate([
+      { $match: { participants: req.user._id, hiddenFor: { $nin: [req.user._id] } } },
+      { $lookup: {
+          from: 'messages',
+          let: { convoId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$conversation', '$$convoId'] },
+              { $ne: ['$sender', req.user._id] },
+              { $eq: ['$read', false] },
+            ] } } },
+          ],
+          as: 'unread',
+      }},
+      { $group: { _id: null, count: { $sum: { $size: '$unread' } } } },
+    ]);
+    const count = result[0]?.count || 0;
     res.json({ count });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch unread count' });
@@ -142,7 +155,8 @@ router.get('/:id/messages', protect, async (req, res) => {
       .populate('sender', 'name avatar')
       .sort({ createdAt: -1 })
       .skip((safePage - 1) * safeLimit)
-      .limit(safeLimit);
+      .limit(safeLimit)
+      .lean();
     // Return in chronological order
     messages.reverse();
     res.json({ data: messages, total, pages: Math.ceil(total / safeLimit), page: safePage });
@@ -206,7 +220,6 @@ router.post('/:id/messages', protect, chatUpload.single('file'), async (req, res
 
     const msg = await Message.create(msgData);
     convo.lastMessage = msg._id;
-    convo.updatedAt   = new Date();
     if (convo.hiddenFor?.length) convo.hiddenFor = [];
     await convo.save();
 
