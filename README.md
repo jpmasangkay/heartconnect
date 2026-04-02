@@ -112,17 +112,17 @@ git clone https://github.com/jpmasangkay/heartconnect.git
 cd heartconnect
 
 # Install frontend dependencies
-cd client
+cd frontend
 npm install
 
 # Install backend dependencies
-cd ../server
+cd ../backend
 npm install
 ```
 
 ### Environment Variables
 
-Create a `.env` file inside the `server/` directory:
+Create a `.env` file inside the `backend/` directory:
 
 ```env
 PORT=5000
@@ -134,7 +134,7 @@ FIREBASE_PRIVATE_KEY=your_firebase_private_key
 FIREBASE_CLIENT_EMAIL=your_firebase_client_email
 ```
 
-Create a `.env` file inside the `client/` directory:
+Create a `.env` file inside the `frontend/` directory:
 
 ```env
 VITE_API_URL=http://localhost:5000
@@ -145,11 +145,11 @@ VITE_SOCKET_URL=http://localhost:5000
 
 ```bash
 # Start the backend server
-cd server
+cd backend
 npm run dev
 
 # In a separate terminal, start the frontend
-cd client
+cd frontend
 npm run dev
 ```
 
@@ -157,7 +157,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Available Scripts
 
-#### Client
+#### Frontend
 
 | Command | Description |
 |---------|-------------|
@@ -166,7 +166,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint across the project |
 
-#### Server
+#### Backend
 
 | Command | Description |
 |---------|-------------|
@@ -180,7 +180,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ```
 heartconnect/
-├── client/                              # React frontend
+├── frontend/                            # React frontend
 │   ├── public/                          # Static assets
 │   └── src/
 │       ├── main.tsx                     # Entry point — React DOM + QueryClientProvider
@@ -234,7 +234,7 @@ heartconnect/
 │           ├── FreelancerDashboard.tsx
 │           └── ChatPage.tsx
 │
-└── server/                              # Express backend
+└── backend/                             # Express backend
     └── src/
         ├── index.ts                     # Server entry point — Express + Socket.io init
         ├── config/
@@ -294,13 +294,13 @@ HeartConnect's frontend is deployed on **Vercel** and the backend is hosted on *
 Pushing to `master` triggers an automatic build and deployment on Vercel.
 
 To deploy your own instance:
-1. Import the `client/` folder into [Vercel](https://vercel.com) as the project root
+1. Import the `frontend/` folder into [Vercel](https://vercel.com) as the project root
 2. Add the following environment variables in Vercel's **Environment Variables** settings:
    ```env
    VITE_API_URL=https://heartconnect.onrender.com
    VITE_SOCKET_URL=https://heartconnect.onrender.com
    ```
-3. Deploy the `server/` to [Render](https://render.com) and configure your server-side environment variables there
+3. Deploy the `backend/` to [Render](https://render.com) and configure your server-side environment variables there
 
 ---
 
