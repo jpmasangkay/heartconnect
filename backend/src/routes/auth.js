@@ -51,6 +51,11 @@ router.post('/register', async (req, res) => {
     if (!agreedToTerms) {
       return res.status(400).json({ message: 'You must agree to the Terms of Service and Privacy Policy' });
     }
+
+    // Prevent self-registration as admin
+    if (!role || !['student', 'client'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be either student or client' });
+    }
     
     if (!password || typeof password !== 'string') {
       return res.status(400).json({ message: 'Password is required' });
@@ -65,7 +70,13 @@ router.post('/register', async (req, res) => {
     if (await User.findOne({ email }))
       return res.status(400).json({ message: 'Email already in use' });
 
-    const user  = await User.create({ name, email, password, role, university, agreedToTerms: true, agreedToTermsAt: new Date() });
+    // Whitelist fields — prevents mass-assignment of sensitive fields
+    // (isBanned, isVerified, twoFactorEnabled, etc.)
+    const allowed = ['name', 'email', 'password', 'role', 'university'];
+    const safeData = Object.fromEntries(
+      Object.entries({ name, email, password, role, university }).filter(([k]) => allowed.includes(k))
+    );
+    const user  = await User.create({ ...safeData, agreedToTerms: true, agreedToTermsAt: new Date() });
     const token = signToken(user._id);
     res.status(201).json({ token, user: { ...user.toObject(), password: undefined, twoFactorSecret: undefined } });
   } catch (err) {
