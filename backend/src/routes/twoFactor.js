@@ -5,6 +5,7 @@ const User    = require('../models/User');
 const protect = require('../middleware/auth');
 const jwt     = require('jsonwebtoken');
 const { sendEmail } = require('../services/email');
+const { sanitizeUser } = require('../services/sanitize');
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -16,7 +17,7 @@ const signToken = (id) =>
 // POST /api/auth/2fa/setup  — generate secret + QR code
 router.post('/setup', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+twoFactorSecret');
     if (user.twoFactorEnabled) {
       return res.status(400).json({ message: '2FA is already enabled' });
     }
@@ -50,7 +51,7 @@ router.post('/setup', protect, async (req, res) => {
 router.post('/verify-setup', protect, async (req, res) => {
   try {
     const { code } = req.body;
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+twoFactorSecret');
 
     if (!user.twoFactorSecret) {
       return res.status(400).json({ message: 'No 2FA setup in progress' });
@@ -87,7 +88,7 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Invalid token' });
     }
 
-    const user = await User.findById(decoded.id).select('+_email2FACode +_email2FACodeExpires');
+    const user = await User.findById(decoded.id).select('+twoFactorSecret +_email2FACode +_email2FACodeExpires');
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ message: 'Invalid request' });
     }
@@ -111,7 +112,7 @@ router.post('/verify', async (req, res) => {
 
     // Issue full token
     const token = signToken(user._id);
-    res.json({ token, user: { ...user.toObject(), password: undefined, twoFactorSecret: undefined } });
+    res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ message: '2FA verification failed' });
   }
@@ -121,7 +122,7 @@ router.post('/verify', async (req, res) => {
 router.post('/disable', protect, async (req, res) => {
   try {
     const { password, code } = req.body;
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password +twoFactorSecret');
 
     if (!(await user.matchPassword(password))) {
       return res.status(400).json({ message: 'Incorrect password' });

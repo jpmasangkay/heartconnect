@@ -2,16 +2,16 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  name:      { type: String, required: true, trim: true },
+  name:      { type: String, required: true, trim: true, maxlength: 100 },
   email:     { type: String, required: true, unique: true, lowercase: true },
-  password:  { type: String, required: true, minlength: 12 },
+  password:  { type: String, required: true, minlength: 12, select: false },
   role:      { type: String, enum: ['student', 'client', 'admin'], required: true },
   avatar:    { type: String },
-  bio:       { type: String },
+  bio:       { type: String, maxlength: 2000 },
   skills:    [{ type: String }],
-  location:  { type: String },
-  university:{ type: String },
-  portfolio: { type: String },
+  location:  { type: String, maxlength: 200 },
+  university:{ type: String, maxlength: 200 },
+  portfolio: { type: String, maxlength: 500 },
 
   // Account security
   failedAttempts: { type: Number, default: 0 },
@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
 
   // Two-Factor Authentication
   twoFactorEnabled: { type: Boolean, default: false },
-  twoFactorSecret:  { type: String },
+  twoFactorSecret:  { type: String, select: false },
   twoFactorMethod:  { type: String, enum: ['totp', 'email'] },
   _email2FACode:    { type: String, select: false },
   _email2FACodeExpires: { type: Date, select: false },

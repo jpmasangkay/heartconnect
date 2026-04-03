@@ -43,6 +43,8 @@ export default function Chat() {
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const refetchedUrlConvRef = useRef<string | null>(null);
+  // Dedup: prevent the same socket message from being appended twice
+  const seenMsgIdsRef = useRef<Set<string>>(new Set());
 
   const conversationsById = useMemo(() => byIdMap(conversations), [conversations]);
 
@@ -94,6 +96,7 @@ export default function Chat() {
     setActiveConv(null);
     setMessages([]);
     setLoadingConvs(true);
+    seenMsgIdsRef.current.clear();
   }, [user?._id]);
 
   // Load conversations — re-run whenever the user changes
@@ -108,8 +111,7 @@ export default function Chat() {
         const r = await messagesApi.getConversations({ signal });
         await waitMinSkeletonMs(t0, signal);
         if (signal.aborted) return;
-        const body = r.data as any;
-        const convos = Array.isArray(body) ? body : body.data ?? [];
+        const convos = r.data.data ?? [];
         setConversations(convos);
       } catch {
         await waitMinSkeletonMs(t0, signal);
@@ -145,9 +147,7 @@ export default function Chat() {
     if (refetchedUrlConvRef.current === conversationId) return;
     refetchedUrlConvRef.current = conversationId;
     void messagesApi.getConversations().then((r) => {
-      const body = r.data as any;
-      const convos = Array.isArray(body) ? body : body.data ?? [];
-      setConversations(convos);
+      setConversations(r.data.data ?? []);
     }).catch(() => {});
   }, [conversationId, loadingConvs, conversationsById, user?._id]);
 
@@ -182,10 +182,16 @@ export default function Chat() {
         const r = await messagesApi.getMessages(convId, { signal });
         await waitMinSkeletonMs(t0, signal);
         if (signal.aborted) return;
-        const body = r.data as any;
-        const msgs = Array.isArray(body) ? body : body.data ?? [];
+        const msgs = r.data.data ?? [];
         setMessages(msgs);
+        // Track loaded message IDs to prevent socket duplicates
+        for (const m of msgs) seenMsgIdsRef.current.add(m._id);
+        // Auto-mark as read immediately when opening a conversation
         void messagesApi.markRead(convId).then(() => refreshUnread()).catch(() => {});
+        // Clear the unread badge for this conversation in the sidebar
+        setConversations((prev) =>
+          prev.map((c) => String(c._id) === convId ? { ...c, unreadCount: 0 } : c)
+        );
       } catch {
         await waitMinSkeletonMs(t0, signal);
         if (signal.aborted) return;
@@ -203,6 +209,12 @@ export default function Chat() {
     if (!socket) return;
 
     const handleMessage = (msg: Message) => {
+      if (!msg?._id) return;
+
+      // Deduplicate: skip if we've already processed this message ID
+      if (seenMsgIdsRef.current.has(msg._id)) return;
+      seenMsgIdsRef.current.add(msg._id);
+
       const convId =
         typeof msg.conversation === 'string'
           ? msg.conversation
@@ -213,9 +225,7 @@ export default function Chat() {
       // Only append into the message pane if we're currently viewing this thread.
       if (isActive) {
         setMessages((prev) => {
-          for (let i = 0; i < prev.length; i++) {
-            if (prev[i]._id === msg._id) return prev;
-          }
+          // Remove optimistic placeholder if it matches
           const filtered = prev.filter(
             (m) =>
               !(
@@ -227,10 +237,15 @@ export default function Chat() {
           return [...filtered, msg];
         });
         
-        // Immediately mark as read to clear the global unread badge
+        // Auto-seen: immediately mark as read when the chat is open
         if (msg.sender._id !== user?._id) {
           void messagesApi.markRead(convId).then(() => refreshUnread());
         }
+
+        // Clear unread badge for the active conversation
+        setConversations((prev) =>
+          prev.map(c => String(c._id) === String(convId) ? { ...c, unreadCount: 0 } : c)
+        );
       }
 
       setConversations((prev) => {
@@ -244,9 +259,7 @@ export default function Chat() {
       // If this message belongs to a conversation not in our list yet, refetch once.
       if (!conversationsById.has(String(convId))) {
         void messagesApi.getConversations().then((r) => {
-          const body = r.data as any;
-          const convos = Array.isArray(body) ? body : body.data ?? [];
-          setConversations(convos);
+          setConversations(r.data.data ?? []);
         }).catch(() => {});
       }
     };

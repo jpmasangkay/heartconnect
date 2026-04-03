@@ -4,6 +4,7 @@ const Job         = require('../models/Job');
 const Notification = require('../models/Notification');
 const protect     = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
+const { escapeHtml } = require('../services/sanitize');
 
 // GET /api/applications/my
 router.get('/my', protect, async (req, res) => {
@@ -105,7 +106,7 @@ router.patch('/:id/status', protect, async (req, res) => {
       app.applicant.email,
       `HeartConnect - Application ${statusLabel}`,
       `<h2>Application ${statusLabel}</h2>
-       <p>Your application for <strong>${app.job.title}</strong> has been <strong>${newStatus}</strong>.</p>
+       <p>Your application for <strong>${escapeHtml(app.job.title)}</strong> has been <strong>${newStatus}</strong>.</p>
        <p>Log in to HeartConnect to see details.</p>`
     );
 

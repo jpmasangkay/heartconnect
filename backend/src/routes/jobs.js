@@ -12,14 +12,10 @@ router.get('/categories', async (req, res) => {
     const cached = cache.get('job:categories');
     if (cached) return res.json(cached);
 
-    const jobs = await Job.find({ status: 'open' }, 'skills').lean();
-    const skillSet = new Set();
-    jobs.forEach((job) => {
-      (job.skills || []).forEach((skill) => {
-        if (skill && skill.trim()) skillSet.add(skill.trim());
-      });
-    });
-    const result = { categories: Array.from(skillSet).sort() };
+    // Use distinct() — MongoDB returns unique values server-side, no document loading
+    const skills = await Job.distinct('skills', { status: 'open' });
+    const filtered = skills.filter((s) => s && s.trim()).map((s) => s.trim()).sort();
+    const result = { categories: filtered };
     cache.set('job:categories', result, 5 * 60 * 1000); // 5 min TTL
     res.json(result);
   } catch (err) {

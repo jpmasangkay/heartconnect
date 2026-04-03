@@ -76,9 +76,8 @@ function setupSocket(server, opts = {}) {
     // Auto-join user-specific room
     socket.join(`user:${socket.userId}`);
 
-    // Mark online
-    onlineUsers.add(socket.userId);
-    // Presence is queried on-demand via 'get_online_status' — no global broadcast.
+    // Mark online (always use String for consistent Set lookups)
+    onlineUsers.add(String(socket.userId));
 
     // Join a conversation room
     socket.on('join_room', (conversationId) => {
@@ -154,11 +153,11 @@ function setupSocket(server, opts = {}) {
       }
     });
 
-    // Typing indicator
-    socket.on('typing', ({ conversationId, userId }) => {
+    // Typing indicator — use authenticated socket.userId, not client-supplied userId
+    socket.on('typing', ({ conversationId }) => {
       if (isSocketRateLimited(socket.id)) return;
       if (conversationId != null && conversationId !== '') {
-        socket.to(String(conversationId)).emit('typing', { userId });
+        socket.to(String(conversationId)).emit('typing', { userId: String(socket.userId) });
       }
     });
 
@@ -167,12 +166,11 @@ function setupSocket(server, opts = {}) {
       socketEventCounts.delete(socket.id);
 
       // Check if user has any other active sockets
-      const sockets = await io.in(`user:${socket.userId}`).fetchSockets();
+      const sockets = await io.in(`user:${String(socket.userId)}`).fetchSockets();
       if (sockets.length === 0) {
-        onlineUsers.delete(socket.userId);
+        onlineUsers.delete(String(socket.userId));
         // Persist lastSeen
         User.findByIdAndUpdate(socket.userId, { lastSeen: new Date() }).catch(() => {});
-        // Presence is queried on-demand via 'get_online_status' — no global broadcast.
       }
     });
   });

@@ -157,13 +157,13 @@ export const applicationsApi = {
 
 export const messagesApi = {
   getConversations: (opts?: { signal?: AbortSignal }) =>
-    api.get<Conversation[]>('/conversations', { signal: opts?.signal }),
+    api.get<{ data: Conversation[]; total: number; pages: number; page: number }>('/conversations', { signal: opts?.signal }),
 
   getOrCreate: (jobId: string, participantId: string) =>
     api.post<Conversation>('/conversations', { jobId, participantId }),
 
   getMessages: (conversationId: string, opts?: { signal?: AbortSignal }) =>
-    api.get<Message[]>(`/conversations/${conversationId}/messages`, { signal: opts?.signal }),
+    api.get<{ data: Message[]; total: number; pages: number; page: number }>(`/conversations/${conversationId}/messages`, { signal: opts?.signal }),
 
   sendMessage: (conversationId: string, content: string) =>
     api.post<Message>(`/conversations/${conversationId}/messages`, { content }),

@@ -10,9 +10,17 @@ router.get('/', protect, async (req, res) => {
     const safePage  = Math.max(1, Math.min(Number(page)  || 1,  1000));
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
 
-    const query = { user: req.user._id };
-    const total = await SavedJob.countDocuments(query);
-    const saved = await SavedJob.find(query)
+    // Pre-filter: find IDs of open jobs to exclude deleted/closed/completed
+    const openJobIds = await Job.find({ status: 'open' }, '_id').lean();
+    const openIdSet = new Set(openJobIds.map((j) => String(j._id)));
+
+    // Get all saved job entries for this user
+    const allSaved = await SavedJob.find({ user: req.user._id }).select('job').lean();
+    // Filter to only those whose job is still open
+    const validSavedIds = allSaved.filter((s) => openIdSet.has(String(s.job))).map((s) => s._id);
+
+    const total = validSavedIds.length;
+    const saved = await SavedJob.find({ _id: { $in: validSavedIds } })
       .populate({
         path: 'job',
         populate: [
@@ -23,11 +31,11 @@ router.get('/', protect, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit);
-    // Filter out deleted jobs and closed/completed ones
-    const data = saved.filter((s) => s.job != null && !['closed', 'completed'].includes(s.job.status));
-    // Use filtered count for accurate pagination
-    const filteredTotal = data.length;
-    res.json({ data, total: filteredTotal, pages: Math.ceil(filteredTotal / safeLimit), page: safePage });
+
+    // Final safety filter for deleted jobs (race condition / orphans)
+    const data = saved.filter((s) => s.job != null);
+
+    res.json({ data, total, pages: Math.ceil(total / safeLimit), page: safePage });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch saved jobs' });
   }

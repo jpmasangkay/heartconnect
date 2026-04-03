@@ -151,19 +151,24 @@ router.get('/pending', protect, async (req, res) => {
     const jobs = await Job.find({ _id: { $in: pendingJobIds } })
       .populate('client', 'name avatar');
 
-    // For each job, find the other participant
+    // Batch load all finished applications for these jobs (replaces N+1 findOne per job)
+    const finishedApps = await Application.find(
+      { job: { $in: pendingJobIds }, status: 'finished' }
+    ).populate('applicant', 'name avatar');
+    const appsByJobId = new Map();
+    for (const app of finishedApps) {
+      appsByJobId.set(String(app.job), app);
+    }
+
     const result = [];
     for (const job of jobs) {
       const isClient = job.client._id.toString() === req.user._id.toString();
       if (isClient) {
-        // Client reviews the accepted applicant
-        const app = await Application.findOne({ job: job._id, status: 'finished' })
-          .populate('applicant', 'name avatar');
+        const app = appsByJobId.get(String(job._id));
         if (app) {
           result.push({ job, reviewee: app.applicant });
         }
       } else {
-        // Student reviews the client
         result.push({ job, reviewee: job.client });
       }
     }

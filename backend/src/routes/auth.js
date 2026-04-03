@@ -4,6 +4,7 @@ const crypto  = require('crypto');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
+const { sanitizeUser, escapeHtml } = require('../services/sanitize');
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -78,7 +79,7 @@ router.post('/register', async (req, res) => {
     );
     const user  = await User.create({ ...safeData, agreedToTerms: true, agreedToTermsAt: new Date() });
     const token = signToken(user._id);
-    res.status(201).json({ token, user: { ...user.toObject(), password: undefined, twoFactorSecret: undefined } });
+    res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     console.error('Registration error:', err);
     // Return Mongoose validation errors if available
@@ -104,7 +105,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email }).select('+password +_email2FACode');
+    const user = await User.findOne({ email }).select('+password +_email2FACode +_email2FACodeExpires');
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -166,7 +167,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = signToken(user._id);
-    res.json({ token, user: { ...user.toObject(), password: undefined, twoFactorSecret: undefined } });
+    res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ message: 'Login failed' });
   }
@@ -245,7 +246,7 @@ router.post('/forgot-password', async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
     await user.save();
 
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
     const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
 
     await sendEmail(
@@ -253,7 +254,7 @@ router.post('/forgot-password', async (req, res) => {
       'HeartConnect - Reset Your Password',
       `<h2>Password Reset Request</h2>
        <p>You requested a password reset. Click the link below to set a new password:</p>
-       <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Reset Password</a>
+       <a href="${escapeHtml(resetUrl)}" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Reset Password</a>
        <p style="margin-top:16px;color:#666;">This link expires in 30 minutes. If you didn't request this, ignore this email.</p>`
     );
 

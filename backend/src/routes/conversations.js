@@ -225,10 +225,7 @@ router.post('/:id/messages', protect, chatUpload.single('file'), async (req, res
 
     await msg.populate('sender', 'name avatar');
 
-    // Broadcast via socket so all participants get it in real time
-    req.app.locals.io.to(convo._id.toString()).emit('receive_message', msg);
-
-    // Also notify participant user rooms
+    // Broadcast to participant user rooms only (no conversation-room emit to avoid duplicates)
     for (const pid of convo.participants) {
       const pidStr = String(pid);
       req.app.locals.io.to(`user:${pidStr}`).emit('receive_message', msg);
