@@ -222,9 +222,10 @@ router.patch('/:id/close', protect, async (req, res) => {
     );
 
     req.app.locals.io.emit('job:updated', job);
-    for (const app of rejectedApps) {
-      // Create notification for each rejected applicant
-      await Notification.create({
+
+    // Batch-create all rejection notifications in a single DB call
+    if (rejectedApps.length > 0) {
+      const notifDocs = rejectedApps.map((app) => ({
         recipient: app.applicant,
         type: 'job_status',
         title: 'Job Closed',
@@ -232,13 +233,17 @@ router.patch('/:id/close', protect, async (req, res) => {
         link: `/jobs/${job._id}`,
         relatedJob: job._id,
         relatedApplication: app._id,
-      });
-      req.app.locals.io.to(`user:${app.applicant}`).emit('application:updated', {
-        _id: app._id, job: job._id, status: 'rejected',
-      });
-      req.app.locals.io.to(`user:${app.applicant}`).emit('notification:new', {
-        type: 'job_status', message: `The job "${job.title}" has been closed.`,
-      });
+      }));
+      await Notification.insertMany(notifDocs);
+
+      for (const app of rejectedApps) {
+        req.app.locals.io.to(`user:${app.applicant}`).emit('application:updated', {
+          _id: app._id, job: job._id, status: 'rejected',
+        });
+        req.app.locals.io.to(`user:${app.applicant}`).emit('notification:new', {
+          type: 'job_status', message: `The job "${job.title}" has been closed.`,
+        });
+      }
     }
 
     res.json(job);
@@ -270,9 +275,10 @@ router.patch('/:id/complete', protect, async (req, res) => {
     );
 
     req.app.locals.io.emit('job:updated', job);
-    for (const app of acceptedApps) {
-      // Create notification for finished applicants
-      await Notification.create({
+
+    // Batch-create all completion notifications in a single DB call
+    if (acceptedApps.length > 0) {
+      const notifDocs = acceptedApps.map((app) => ({
         recipient: app.applicant,
         type: 'job_status',
         title: 'Job Completed',
@@ -280,13 +286,17 @@ router.patch('/:id/complete', protect, async (req, res) => {
         link: `/dashboard`,
         relatedJob: job._id,
         relatedApplication: app._id,
-      });
-      req.app.locals.io.to(`user:${app.applicant}`).emit('application:updated', {
-        _id: app._id, job: job._id, status: 'finished',
-      });
-      req.app.locals.io.to(`user:${app.applicant}`).emit('notification:new', {
-        type: 'job_status', message: `The job "${job.title}" has been completed!`,
-      });
+      }));
+      await Notification.insertMany(notifDocs);
+
+      for (const app of acceptedApps) {
+        req.app.locals.io.to(`user:${app.applicant}`).emit('application:updated', {
+          _id: app._id, job: job._id, status: 'finished',
+        });
+        req.app.locals.io.to(`user:${app.applicant}`).emit('notification:new', {
+          type: 'job_status', message: `The job "${job.title}" has been completed!`,
+        });
+      }
     }
 
     res.json(job);

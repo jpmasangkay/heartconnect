@@ -1,4 +1,5 @@
-const router  = require('express').Router();
+const router   = require('express').Router();
+const mongoose = require('mongoose');
 const { Conversation, Message } = require('../models/Conversation');
 const Application = require('../models/Application');
 const Job = require('../models/Job');
@@ -218,10 +219,19 @@ router.post('/:id/messages', protect, chatUpload.single('file'), async (req, res
       msgData.fileSize = req.file.size;
     }
 
-    const msg = await Message.create(msgData);
-    convo.lastMessage = msg._id;
-    if (convo.hiddenFor?.length) convo.hiddenFor = [];
-    await convo.save();
+    // Use a transaction so message + conversation update are atomic
+    const session = await mongoose.startSession();
+    let msg;
+    try {
+      await session.withTransaction(async () => {
+        [msg] = await Message.create([msgData], { session });
+        convo.lastMessage = msg._id;
+        if (convo.hiddenFor?.length) convo.hiddenFor = [];
+        await convo.save({ session });
+      });
+    } finally {
+      session.endSession();
+    }
 
     await msg.populate('sender', 'name avatar');
 
