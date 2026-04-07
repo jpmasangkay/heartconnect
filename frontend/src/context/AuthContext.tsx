@@ -41,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await waitMinSkeletonMs(t0, signal);
         if (signal.aborted) return;
         const { socketToken, ...userData } = response.data;
+        if (!userData || typeof userData !== 'object' || !('_id' in userData)) {
+          throw new Error('Invalid /me response');
+        }
         setUser(userData as User);
         setToken(socketToken ?? null);
       } catch {
