@@ -84,7 +84,7 @@ app.use('/uploads', (req, res, next) => {
 // ─── CORS (S2: reject null origin in production) ─────────────────────────────
 const corsOrigin = isProd
   ? (origin, cb) => {
-      if (!origin) return cb(new Error('Origin header required'));
+      if (!origin) return cb(null, true);
       if (clientUrls.includes(origin)) return cb(null, true);
       cb(new Error('Not allowed by CORS'));
     }
