@@ -365,7 +365,7 @@ function ClientDashboard({ user }: { user: User }) {
                   <div className="divide-y divide-stone-border w-full">
                     {open.map((job) => (
                       <div key={job._id} className="py-5">
-                        <JobRow job={job} onClose={handleClose}>
+                        <JobRow job={job}>
                           <Link
                             to={`/jobs/${job._id}`}
                             className="text-xs text-stone-muted hover:text-foreground font-medium flex items-center gap-1"
@@ -508,9 +508,9 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto w-full px-6 lg:px-8 py-10 flex-1">
         {user?.role === 'client' ? (
           <ClientDashboard user={user} />
-        ) : (
+        ) : user ? (
           <StudentDashboard user={user} />
-        )}
+        ) : null}
       </main>
     </div>
   );

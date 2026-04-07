@@ -97,7 +97,7 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (activeTab !== 'users') return;
     clearTimeout(searchTimerRef.current);
