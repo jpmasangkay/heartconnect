@@ -1,10 +1,17 @@
 const router  = require('express').Router();
 const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
+const bcrypt  = require('bcryptjs');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
+const { COOKIE_NAME } = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
 const { sanitizeUser, escapeHtml } = require('../services/sanitize');
+
+// Pre-hashed dummy to prevent timing side-channel on user-not-found
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
+
+const isProd = process.env.NODE_ENV === 'production';
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -12,6 +19,25 @@ const signToken = (id) =>
     issuer: 'heartconnect',
     audience: 'heartconnect-api',
   });
+
+function setTokenCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+}
+
+function clearTokenCookie(res) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/',
+  });
+}
 
 const signTempToken = (id) =>
   jwt.sign({ id, requires2FA: true }, process.env.JWT_SECRET, {
@@ -79,6 +105,7 @@ router.post('/register', async (req, res) => {
     );
     const user  = await User.create({ ...safeData, agreedToTerms: true, agreedToTermsAt: new Date() });
     const token = signToken(user._id);
+    setTokenCookie(res, token);
     res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     console.error('Registration error:', err);
@@ -108,6 +135,8 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email }).select('+password +_email2FACode +_email2FACodeExpires');
 
     if (!user) {
+      // Constant-time: always run a bcrypt compare to prevent timing side-channel
+      await bcrypt.compare(password, DUMMY_HASH);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     
@@ -167,21 +196,17 @@ router.post('/login', async (req, res) => {
     }
 
     const token = signToken(user._id);
+    setTokenCookie(res, token);
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ message: 'Login failed' });
   }
 });
 
-// GET /api/auth/me
+// GET /api/auth/me — returns user data + a short-lived token for socket handshake
 router.get('/me', protect, (req, res) => {
-  const userObj = req.user.toObject ? req.user.toObject() : { ...req.user };
-  delete userObj.password;
-  delete userObj.twoFactorSecret;
-  delete userObj.resetPasswordToken;
-  delete userObj.resetPasswordExpires;
-  delete userObj._email2FACode;
-  res.json(userObj);
+  const socketToken = signToken(req.user._id);
+  res.json({ ...sanitizeUser(req.user), socketToken });
 });
 
 // PUT /api/auth/profile
@@ -226,7 +251,8 @@ router.put('/password', protect, async (req, res) => {
 });
 
 // POST /api/auth/logout
-router.post('/logout', (req, res) => {
+router.post('/logout', (_req, res) => {
+  clearTokenCookie(res);
   res.json({ message: 'Logged out successfully' });
 });
 

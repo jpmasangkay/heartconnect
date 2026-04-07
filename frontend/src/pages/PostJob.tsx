@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, AlertCircle } from 'lucide-react';
 import { Input, Select, Textarea, FormField } from '../components/ui/forms';
 import { jobsApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 
 export default function PostJob() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export default function PostJob() {
 
   const addSkill = () => {
     const s = skillInput.trim();
-    if (s && !skills.includes(s)) {
+    if (s && !skills.some((existing) => existing.toLowerCase() === s.toLowerCase())) {
       setSkills([...skills, s]);
       setSkillInput('');
     }
@@ -53,14 +54,8 @@ export default function PostJob() {
     try {
       const res = await jobsApi.create({ title, description, budget: Number(budget), budgetType, deadline, skills });
       navigate(`/jobs/${res.data._id}`);
-    } catch (err: any) {
-      // Backend returns either { message: string } or { errors: string[] }
-      const data = err.response?.data;
-      if (data?.errors && Array.isArray(data.errors)) {
-        setError(data.errors.join(' · '));
-      } else {
-        setError(data?.message || 'Failed to post job.');
-      }
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Failed to post job.'));
       setLoading(false);
     }
   };

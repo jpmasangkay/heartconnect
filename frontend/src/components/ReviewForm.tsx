@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Star } from 'lucide-react';
 import { reviewsApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { Button } from './ui/button';
 
 interface ReviewFormProps {
@@ -29,8 +30,8 @@ export default function ReviewForm({ jobId, jobTitle, revieweeId, revieweeName, 
     try {
       await reviewsApi.create({ jobId, revieweeId, rating, comment: comment.trim() || undefined });
       onSubmitted();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to submit review');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Failed to submit review'));
     } finally {
       setLoading(false);
     }

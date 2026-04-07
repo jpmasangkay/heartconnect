@@ -90,6 +90,7 @@ export function useInView<T extends HTMLElement>(
     }, { threshold: 0.15, ...options });
     observer.observe(el);
     return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [once]);
 
   return [ref, inView];

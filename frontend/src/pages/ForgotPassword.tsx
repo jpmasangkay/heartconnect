@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { Input } from '../components/ui/forms';
 import { Button } from '../components/ui/button';
 
@@ -18,8 +19,8 @@ export default function ForgotPassword() {
     try {
       await authApi.forgotPassword(email.trim());
       setSent(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Something went wrong');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Something went wrong'));
     } finally {
       setLoading(false);
     }

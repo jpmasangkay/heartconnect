@@ -106,7 +106,6 @@ function setupSocket(server, opts = {}) {
       try {
         if (isSocketRateLimited(socket.id)) return;
 
-        // Validate input
         if (!content || typeof content !== 'string' || !content.trim() || content.length > 5000) return;
         const safeContent = content.trim();
         const convId = String(conversationId);
@@ -114,8 +113,8 @@ function setupSocket(server, opts = {}) {
         const uid = String(socket.userId);
         if (!convo || !convo.participants.map((p) => String(p)).includes(uid)) return;
 
-        // Block check: verify neither participant has blocked the other
         const sender = await User.findById(socket.userId);
+        if (sender?.isBanned) return;
         const otherParticipant = convo.participants.find((p) => String(p) !== uid);
         if (otherParticipant) {
           const other = await User.findById(otherParticipant);

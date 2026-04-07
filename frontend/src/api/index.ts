@@ -21,15 +21,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-});
-
-// Attach JWT to every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
 });
 
 // Redirect on 401 (but not for /auth/* endpoints which manage their own UX)
@@ -47,7 +39,6 @@ api.interceptors.response.use(
       url.includes('auth/reset-password') ||
       url.includes('auth/2fa');
     if (error.response?.status === 401 && !isAuthRoute) {
-      localStorage.removeItem('token');
       window.location.replace('/login');
     }
     return Promise.reject(error);
@@ -64,7 +55,7 @@ export const authApi = {
     api.post<{ token: string; user: User }>('/auth/register', data),
 
   getMe: (opts?: { signal?: AbortSignal }) =>
-    api.get<User>('/auth/me', { signal: opts?.signal }),
+    api.get<User & { socketToken?: string }>('/auth/me', { signal: opts?.signal }),
 
   updateProfile: (data: Partial<User>) =>
     api.put<User>('/auth/profile', data),

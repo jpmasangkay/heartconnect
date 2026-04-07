@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, GraduationCap, Briefcase } from 'lucide-react';
 import { Input, Label, FormField } from '../components/ui/forms';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../lib/utils';
+import { cn, getAxiosErrorMessage } from '../lib/utils';
 import type { UserRole } from '../types';
 import { Modal } from '../components/ui/Modal';
 import TermsContent from '../components/TermsContent';
@@ -63,13 +63,8 @@ export default function Register() {
     try {
       await register({ name, email, password, role, university: role === 'student' ? university : undefined, agreedToTerms });
       navigate('/dashboard');
-    } catch (err: any) {
-      const data = err.response?.data;
-      if (data?.errors && Array.isArray(data.errors)) {
-        setError(data.errors.join(' · '));
-      } else {
-        setError(data?.message || 'Registration failed. Please try again.');
-      }
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -225,16 +220,7 @@ export default function Register() {
                 </p>
               </FormField>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-navy hover:bg-navy-light text-white text-sm font-semibold py-2.5 rounded transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Creating account...' : 'Create account'}
-              </button>
-
-              {/* Consent checkbox */}
-              <label className="flex items-start gap-2.5 mt-1 cursor-pointer">
+              <label className="flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={agreedToTerms}
@@ -248,13 +234,15 @@ export default function Register() {
                   <button type="button" onClick={(e) => { e.preventDefault(); setShowPrivacy(true); }} className="underline hover:text-navy">Privacy Policy</button>.
                 </span>
               </label>
-            </form>
 
-            <p className="mt-4 text-xs text-stone-muted text-center">
-              By signing up you agree to our{' '}
-              <button type="button" onClick={() => setShowTerms(true)} className="underline hover:text-navy">Terms of Service</button> and{' '}
-              <button type="button" onClick={() => setShowPrivacy(true)} className="underline hover:text-navy">Privacy Policy</button>.
-            </p>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-navy hover:bg-navy-light text-white text-sm font-semibold py-2.5 rounded transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creating account...' : 'Create account'}
+              </button>
+            </form>
             </div>
           </div>
         </div>

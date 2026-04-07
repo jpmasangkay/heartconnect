@@ -3,9 +3,12 @@ const { authenticator } = require('otplib');
 const QRCode  = require('qrcode');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
+const { COOKIE_NAME } = require('../middleware/auth');
 const jwt     = require('jsonwebtoken');
 const { sendEmail } = require('../services/email');
 const { sanitizeUser } = require('../services/sanitize');
+
+const isProd = process.env.NODE_ENV === 'production';
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -13,6 +16,16 @@ const signToken = (id) =>
     issuer: 'heartconnect',
     audience: 'heartconnect-api',
   });
+
+function setTokenCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+}
 
 // POST /api/auth/2fa/setup  — generate secret + QR code
 router.post('/setup', protect, async (req, res) => {
@@ -110,8 +123,9 @@ router.post('/verify', async (req, res) => {
       await user.save();
     }
 
-    // Issue full token
+    // Issue full token and set httpOnly cookie
     const token = signToken(user._id);
+    setTokenCookie(res, token);
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ message: '2FA verification failed' });

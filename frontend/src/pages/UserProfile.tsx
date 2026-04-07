@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GraduationCap, MapPin, Globe, ChevronLeft, Flag, Ban, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { authApi, reportsApi, blocksApi, reviewsApi } from '../api';
+import { authApi, blocksApi, reviewsApi } from '../api';
+import ReportModal from '../components/ReportModal';
 import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { useAuth } from '../context/AuthContext';
-import type { User, ReportReason, Review } from '../types';
+import type { User, Review } from '../types';
 
 export default function UserProfile() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState<ReportReason>('spam');
-  const [reportDesc, setReportDesc] = useState('');
   const [reportMsg, setReportMsg] = useState('');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [avgRating, setAvgRating] = useState(0);
@@ -76,17 +76,6 @@ export default function UserProfile() {
     } catch { /* noop */ }
   };
 
-  const handleReport = async () => {
-    if (!id) return;
-    try {
-      await reportsApi.create({ targetType: 'user', targetId: id, reason: reportReason, description: reportDesc || undefined });
-      setReportMsg('Report submitted. Thank you.');
-      setShowReportModal(false);
-      setReportDesc('');
-    } catch {
-      setReportMsg('Failed to submit report.');
-    }
-  };
 
   const profileKey = loading ? 'loading' : notFound || !profile ? 'missing' : 'profile';
 
@@ -130,13 +119,13 @@ export default function UserProfile() {
       ) : (
     <div className="min-h-screen bg-cream flex flex-col">
       <main className="max-w-2xl mx-auto w-full px-6 py-10 flex-1">
-        <Link
-          to={-1 as any}
+        <button
+          onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1.5 text-sm text-stone-muted hover:text-navy transition-colors mb-6"
         >
           <ChevronLeft size={14} />
           Back
-        </Link>
+        </button>
 
         {/* Avatar + name */}
         <div className="bg-white border border-stone-border rounded-sm p-7 mb-5">
@@ -281,47 +270,14 @@ export default function UserProfile() {
         </div>
       </main>
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowReportModal(false)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Report User</h3>
-            <label className="block text-sm text-foreground font-medium mb-1">Reason</label>
-            <select
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value as ReportReason)}
-              className="w-full border border-stone-border rounded-lg px-3 py-2 text-sm mb-3 bg-white"
-            >
-              <option value="spam">Spam</option>
-              <option value="harassment">Harassment</option>
-              <option value="inappropriate">Inappropriate Content</option>
-              <option value="fraud">Fraud</option>
-              <option value="other">Other</option>
-            </select>
-            <label className="block text-sm text-foreground font-medium mb-1">Description (optional)</label>
-            <textarea
-              value={reportDesc}
-              onChange={(e) => setReportDesc(e.target.value)}
-              placeholder="Tell us more about the issue..."
-              className="w-full border border-stone-border rounded-lg px-3 py-2 text-sm mb-4 min-h-[80px] resize-y"
-              maxLength={2000}
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-sm text-stone-muted hover:text-foreground px-4 py-2 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReport}
-                className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg"
-              >
-                Submit Report
-              </button>
-            </div>
-          </div>
-        </div>
+      {showReportModal && id && (
+        <ReportModal
+          targetType="user"
+          targetId={id}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={(msg) => setReportMsg(msg)}
+          onError={(msg) => setReportMsg(msg)}
+        />
       )}
     </div>
       )}

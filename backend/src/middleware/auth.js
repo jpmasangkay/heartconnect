@@ -1,12 +1,18 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-module.exports = async (req, res, next) => {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer '))
-    return res.status(401).json({ message: 'No token provided' });
+const COOKIE_NAME = 'hc_token';
 
-  const token = header.split(' ')[1];
+module.exports = async (req, res, next) => {
+  // Prefer httpOnly cookie; fall back to Authorization header for Socket.io & legacy clients
+  let token = req.cookies?.[COOKIE_NAME];
+  if (!token) {
+    const header = req.headers.authorization;
+    if (header?.startsWith('Bearer ')) token = header.split(' ')[1];
+  }
+
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { issuer: 'heartconnect', audience: 'heartconnect-api' });
     req.user = await User.findById(decoded.id).select('-password');
@@ -22,3 +28,5 @@ module.exports = async (req, res, next) => {
     res.status(401).json({ message: 'Invalid token' });
   }
 };
+
+module.exports.COOKIE_NAME = COOKIE_NAME;

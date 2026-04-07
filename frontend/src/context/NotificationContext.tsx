@@ -54,6 +54,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Load on mount if authenticated
   useEffect(() => {
     if (!isAuthenticated) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotifications([]);
       setUnreadCount(0);
       return;
@@ -112,6 +113,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotifications(): NotificationContextType {
   const ctx = useContext(NotificationContext);
   if (!ctx) throw new Error('useNotifications must be used within <NotificationProvider>');

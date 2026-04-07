@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
 import { Shield, CheckCircle, XCircle, Flag, AlertTriangle, Users, Ban, Search } from 'lucide-react';
 import Footer from '../components/Footer';
 import { verificationApi, reportsApi, adminApi } from '../api';
@@ -23,7 +23,7 @@ export default function AdminDashboard() {
   const [banUserId, setBanUserId] = useState('');
   const [banReason, setBanReason] = useState('');
   const [banMsg, setBanMsg] = useState('');
-  const [autoBanThreshold] = useState(3);
+  const autoBanThreshold = 3;
 
   const backendUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '');
 
@@ -97,8 +97,12 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    if (activeTab === 'users') fetchUsers(userSearch);
+    if (activeTab !== 'users') return;
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => fetchUsers(userSearch), 350);
+    return () => clearTimeout(searchTimerRef.current);
   }, [activeTab, fetchUsers, userSearch]);
 
   const handleReportAction = async (reportId: string, action: 'reviewed' | 'dismissed') => {
@@ -106,7 +110,7 @@ export default function AdminDashboard() {
     try {
       const res = await reportsApi.resolve(reportId, action);
       setReports((prev) => prev.filter((r) => r._id !== reportId));
-      if ((res.data as any).autoBanned) {
+      if ((res.data as { autoBanned?: boolean }).autoBanned) {
         alert('⚠️ User has been auto-banned (reached 3 valid reports).');
         if (activeTab === 'users') fetchUsers(userSearch);
       }
@@ -281,11 +285,11 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Show uploaded ID image */}
-                  {(user as any).verificationDoc && (
+                  {user.verificationDoc && (
                     <div className="mt-3">
                       <p className="text-xs text-stone-muted mb-1">Uploaded ID:</p>
                       <img
-                        src={`${backendUrl}${(user as any).verificationDoc}`}
+                        src={`${backendUrl}${user.verificationDoc}`}
                         alt="ID Document"
                         className="max-w-xs rounded border border-stone-border"
                       />

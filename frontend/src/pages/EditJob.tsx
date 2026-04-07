@@ -6,6 +6,7 @@ import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { jobsApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 import type { Job, JobStatus } from '../types';
 
 
@@ -63,7 +64,7 @@ export default function EditJob() {
 
   const addSkill = () => {
     const s = skillInput.trim();
-    if (s && !skills.includes(s)) {
+    if (s && !skills.some((existing) => existing.toLowerCase() === s.toLowerCase())) {
       setSkills([...skills, s]);
       setSkillInput('');
     }
@@ -82,13 +83,8 @@ export default function EditJob() {
     try {
       await jobsApi.update(id!, { title, description, budget: Number(budget), budgetType, deadline, status, skills });
       navigate(`/jobs/${id}`);
-    } catch (err: any) {
-      const data = err.response?.data;
-      if (data?.errors && Array.isArray(data.errors)) {
-        setError(data.errors.join(' · '));
-      } else {
-        setError(data?.message || 'Failed to update job.');
-      }
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Failed to update job.'));
       setSaving(false);
     }
   };
@@ -99,7 +95,9 @@ export default function EditJob() {
       await jobsApi.delete(id!);
       navigate('/dashboard');
     } catch {
-      navigate('/dashboard');
+      setError('Failed to delete job. Please try again.');
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 

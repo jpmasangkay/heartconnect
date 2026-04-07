@@ -3,13 +3,15 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Clock, DollarSign, Users, CheckCircle2, XCircle, MessageSquare, Pencil, AlertCircle, ChevronLeft, Star, Flag } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Input, Textarea, Badge, FormField, type BadgeVariant } from '../components/ui/forms';
-import { jobsApi, applicationsApi, messagesApi, reviewsApi, reportsApi } from '../api';
+import { jobsApi, applicationsApi, messagesApi, reviewsApi } from '../api';
+import ReportModal from '../components/ReportModal';
 import { FadePresence } from '../components/ui/loading-fade';
 import { Skeleton } from '../components/ui/skeleton';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import type { Job, Application, Review, ReportReason } from '../types';
+import type { Job, Application, Review } from '../types';
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,8 +36,6 @@ export default function JobDetail() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState<ReportReason>('spam');
-  const [reportDesc, setReportDesc] = useState('');
   const [reportMsg, setReportMsg] = useState('');
 
   useEffect(() => {
@@ -47,8 +47,24 @@ export default function JobDetail() {
       setLoading(true);
       const t0 = Date.now();
       try {
-        const res = await jobsApi.getById(id, { signal });
-        setJob(res.data);
+        const [jobRes, revRes] = await Promise.all([
+          jobsApi.getById(id, { signal }),
+          reviewsApi.getForJob(id, { signal }).catch(() => ({ data: [] as Review[] })),
+        ]);
+        setJob(jobRes.data);
+
+        // Reviews
+        const revData = revRes.data;
+        setReviews(Array.isArray(revData) ? revData : []);
+        if (user) {
+          const already = (Array.isArray(revData) ? revData : []).some((r: Review) => {
+            const reviewerId = typeof r.reviewer === 'string' ? r.reviewer : r.reviewer._id;
+            return reviewerId === user._id;
+          });
+          setHasReviewed(already);
+        }
+
+        // Fetch role-specific data in parallel with the above
         if (user?.role === 'client') {
           const apps = await applicationsApi.getForJob(id, { signal });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +76,7 @@ export default function JobDetail() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const myBody = myApps.data as any;
           const myArr = Array.isArray(myBody) ? myBody : myBody.data ?? [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const mine = myArr.find((a: Application) => (a.job as any)._id === id || a.job._id === id);
           if (mine) setMyApplication(mine);
         }
@@ -68,20 +85,6 @@ export default function JobDetail() {
         setLoadError(true);
       }
 
-      // Fetch reviews for this job
-      try {
-        const rev = await reviewsApi.getForJob(id, { signal });
-        setReviews(rev.data);
-        // Check if current user already reviewed
-        if (user) {
-          const already = rev.data.some((r: Review) => {
-            const reviewerId = typeof r.reviewer === 'string' ? r.reviewer : r.reviewer._id;
-            return reviewerId === user._id;
-          });
-          setHasReviewed(already);
-        }
-      } catch { /* noop */ }
-
       await waitMinSkeletonMs(t0, signal);
       if (signal.aborted) return;
       setLoading(false);
@@ -89,7 +92,8 @@ export default function JobDetail() {
 
     void load();
     return () => ac.abort();
-  }, [id, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, user?._id, user?.role]);
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -150,8 +154,8 @@ export default function JobDetail() {
       const res = await applicationsApi.apply(id!, { coverLetter, proposedRate: Number(proposedRate) });
       setMyApplication(res.data);
       setSuccess('Application submitted!');
-    } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Failed to submit application.');
+    } catch (err: unknown) {
+      setFormError(getAxiosErrorMessage(err, 'Failed to submit application.'));
     } finally {
       setApplying(false);
     }
@@ -168,8 +172,9 @@ export default function JobDetail() {
         next[i] = { ...prev[i], status };
         return next;
       });
-    } catch { /* noop */ }
-    finally { setActionLoading(null); }
+    } catch {
+      setFormError(`Failed to ${status} application. Please try again.`);
+    } finally { setActionLoading(null); }
   };
 
   const handleMessage = async (applicantId: string) => {
@@ -204,19 +209,11 @@ export default function JobDetail() {
       setReviews((prev) => [...prev, res.data]);
       setHasReviewed(true);
       setReviewComment('');
-    } catch { /* noop */ }
-    finally { setReviewSubmitting(false); }
+    } catch {
+      setFormError('Failed to submit review. Please try again.');
+    } finally { setReviewSubmitting(false); }
   };
 
-  const handleReportJob = async () => {
-    if (!id) return;
-    try {
-      await reportsApi.create({ targetType: 'job', targetId: id, reason: reportReason, description: reportDesc || undefined });
-      setReportMsg('Report submitted. Thank you.');
-      setShowReportModal(false);
-      setReportDesc('');
-    } catch { setReportMsg('Failed to submit report.'); }
-  };
 
   if (!loading && loadError) return (
     <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-3 px-6">
@@ -628,46 +625,14 @@ export default function JobDetail() {
         </div>
       </main>
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowReportModal(false)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Report Job</h3>
-            <label className="block text-sm text-foreground font-medium mb-1">Reason</label>
-            <select
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value as ReportReason)}
-              className="w-full border border-stone-border rounded-lg px-3 py-2 text-sm mb-3 bg-white"
-            >
-              <option value="spam">Spam</option>
-              <option value="inappropriate">Inappropriate Content</option>
-              <option value="fraud">Fraud / Scam</option>
-              <option value="other">Other</option>
-            </select>
-            <label className="block text-sm text-foreground font-medium mb-1">Description (optional)</label>
-            <textarea
-              value={reportDesc}
-              onChange={(e) => setReportDesc(e.target.value)}
-              placeholder="Tell us more about the issue..."
-              className="w-full border border-stone-border rounded-lg px-3 py-2 text-sm mb-4 min-h-[80px] resize-y"
-              maxLength={2000}
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-sm text-stone-muted hover:text-foreground px-4 py-2 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReportJob}
-                className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg"
-              >
-                Submit Report
-              </button>
-            </div>
-          </div>
-        </div>
+      {showReportModal && id && (
+        <ReportModal
+          targetType="job"
+          targetId={id}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={(msg) => setReportMsg(msg)}
+          onError={(msg) => setReportMsg(msg)}
+        />
       )}
     </div>
       )}

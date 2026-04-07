@@ -32,6 +32,8 @@ export interface User {
   reportTally?: { reviewed: number; pending: number };
   // Legal consent
   agreedToTerms?: boolean;
+  // Verification document path (admin endpoints)
+  verificationDoc?: string;
 }
 
 // Auth types

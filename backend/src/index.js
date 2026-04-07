@@ -9,14 +9,15 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-const express     = require('express');
-const http        = require('http');
-const path        = require('path');
-const cors        = require('cors');
-const helmet      = require('helmet');
-const compression = require('compression');
-const rateLimit   = require('express-rate-limit');
-const mongoose    = require('mongoose');
+const express      = require('express');
+const http         = require('http');
+const path         = require('path');
+const cors         = require('cors');
+const helmet       = require('helmet');
+const compression  = require('compression');
+const rateLimit    = require('express-rate-limit');
+const mongoose     = require('mongoose');
+const cookieParser = require('cookie-parser');
 const requestId  = require('./middleware/requestId');
 const monitor    = require('./middleware/monitor');
 const logger     = require('./services/logger');
@@ -42,7 +43,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
@@ -54,16 +55,9 @@ app.use(helmet({
 // Limit payload size to prevent DoS
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ limit: '10kb', extended: false }));
+app.use(cookieParser());
 
-// ─── Static Files (uploaded files) ────────────────────────────────────────────
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  next();
-}, express.static(path.join(__dirname, '..', 'uploads')));
-
-// ─── CORS ─────────────────────────────────────────────────────────────────────
-// Comma-separated browser origins for the web app (Vite). Native apps often send no Origin.
+// ─── CORS origin setup (used by /uploads, CORS middleware, and Socket.io) ────
 const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((s) => s.trim().replace(/\/$/, ''))
@@ -76,6 +70,18 @@ if (isProd) {
     }
   }
 }
+
+// ─── Static Files (uploaded files) ────────────────────────────────────────────
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  const origin = req.headers.origin;
+  if (!isProd || !origin || clientUrls.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  next();
+}, express.static(path.join(__dirname, '..', 'uploads')));
+
+// ─── CORS ─────────────────────────────────────────────────────────────────────
 const corsOrigin = isProd
   ? (origin, cb) => {
       if (!origin) return cb(null, true);
@@ -88,7 +94,7 @@ app.use(cors({
   origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
+  credentials: true,
 }));
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
@@ -128,8 +134,8 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/auth/2fa/verify', authLimiter);
-app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth/2fa',       require('./routes/twoFactor'));
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/jobs',           require('./routes/jobs'));
 app.use('/api/applications',   require('./routes/applications'));
 app.use('/api/conversations',  require('./routes/conversations'));
@@ -170,7 +176,7 @@ const io = setupSocket(server, {
   cors: {
     origin: corsOrigin,
     methods: ['GET', 'POST'],
-    credentials: false,
+    credentials: true,
   },
 });
 app.locals.io = io;

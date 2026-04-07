@@ -34,6 +34,7 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
 
   // Initial fetch on auth change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshUnread();
   }, [isAuthenticated, refreshUnread]);
 
@@ -43,9 +44,13 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
     if (!socket) return;
 
     const handleNewMessage = (msg: Message) => {
-      // Avoid double-counting: we may receive the same message via both user-room + conversation-room emits.
       if (!msg?._id) return;
       if (seenMessageIdsRef.current.has(msg._id)) return;
+      // Bound the set to prevent unbounded growth in long sessions
+      if (seenMessageIdsRef.current.size >= 500) {
+        const arr = [...seenMessageIdsRef.current];
+        seenMessageIdsRef.current = new Set(arr.slice(-250));
+      }
       seenMessageIdsRef.current.add(msg._id);
 
       // Don't count messages you sent.
@@ -71,6 +76,7 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useUnread() {
   return useContext(UnreadContext);
 }

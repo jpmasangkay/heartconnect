@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { Input } from '../components/ui/forms';
 import { Button } from '../components/ui/button';
 
@@ -27,9 +28,8 @@ export default function ResetPassword() {
     try {
       await authApi.resetPassword(token, password);
       setDone(true);
-    } catch (err: any) {
-      const data = err.response?.data;
-      setError(data?.errors?.join(', ') || data?.message || 'Reset failed');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Reset failed'));
     } finally {
       setLoading(false);
     }

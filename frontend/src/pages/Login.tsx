@@ -2,6 +2,7 @@ import { useState, useRef, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import axios from 'axios';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { Input, FormField } from '../components/ui/forms';
 import { useAuth } from '../context/AuthContext';
 import { twoFactorApi } from '../api';
@@ -85,13 +86,11 @@ export default function Login() {
     setError('');
     setCodeLoading(true);
     try {
-      const res = await twoFactorApi.verify(tempToken, code);
-      const { token } = res.data;
-      localStorage.setItem('token', token);
-      // Force a page reload to re-initialize AuthContext with fresh user data
+      await twoFactorApi.verify(tempToken, code);
+      // Cookie is now set by the server; reload to re-initialize AuthContext
       window.location.replace(from);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid code. Try again.');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Invalid code. Try again.'));
     } finally {
       setCodeLoading(false);
     }
@@ -120,7 +119,9 @@ export default function Login() {
               <div>
                 <h1 className="text-xl font-bold text-foreground">Two-Factor Authentication</h1>
                 <p className="text-xs text-stone-muted">
-                  Enter the code sent to your email
+                  {twoFactorMethod === 'totp'
+                    ? 'Enter the code from your authenticator app'
+                    : 'Enter the code sent to your email'}
                 </p>
               </div>
             </div>

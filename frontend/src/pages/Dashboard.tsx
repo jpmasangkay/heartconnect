@@ -11,7 +11,7 @@ import { jobsApi, applicationsApi } from '../api';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import type { Job, Application } from '../types';
+import type { Job, Application, User } from '../types';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -21,7 +21,7 @@ function getGreeting(): string {
 }
 
 // ── Student dashboard ─────────────────────────────────────────────────────────
-function StudentDashboard({ user }: { user: any }) {
+function StudentDashboard({ user }: { user: User }) {
   const { socket } = useSocket();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +197,7 @@ function StudentDashboard({ user }: { user: any }) {
 }
 
 // ── Client dashboard ──────────────────────────────────────────────────────────
-function ClientDashboard({ user }: { user: any }) {
+function ClientDashboard({ user }: { user: User }) {
   const { socket } = useSocket();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,9 +254,11 @@ function ClientDashboard({ user }: { user: any }) {
     };
   }, [socket]);
 
-  const open      = jobs.filter((j) => j.status === 'open');
-  const closed    = jobs.filter((j) => j.status === 'closed');
-  const completed = jobs.filter((j) => j.status === 'completed');
+  const { open, closed, completed } = useMemo(() => ({
+    open: jobs.filter((j) => j.status === 'open'),
+    closed: jobs.filter((j) => j.status === 'closed'),
+    completed: jobs.filter((j) => j.status === 'completed'),
+  }), [jobs]);
 
   const handleClose = async (jobId: string) => {
     try {
@@ -462,12 +464,10 @@ function JobRow({
   job,
   muted,
   children,
-  onClose: _onClose,
 }: {
   job: Job;
   muted?: boolean;
   children?: ReactNode;
-  onClose?: (id: string) => void;
 }) {
   const apps = job.applicationsCount ?? 0;
   return (

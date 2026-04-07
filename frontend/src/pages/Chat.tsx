@@ -48,6 +48,28 @@ export default function Chat() {
 
   const conversationsById = useMemo(() => byIdMap(conversations), [conversations]);
 
+  // Refs mirror state so socket handlers read current values without re-registering listeners
+  const activeConvRef = useRef(activeConv);
+  activeConvRef.current = activeConv;
+  const conversationsByIdRef = useRef(conversationsById);
+  conversationsByIdRef.current = conversationsById;
+
+  const MAX_SEEN_IDS = 500;
+  const trackSeenId = useCallback((id: string) => {
+    const set = seenMsgIdsRef.current;
+    if (set.has(id)) return false;
+    if (set.size >= MAX_SEEN_IDS) {
+      const it = set.values();
+      for (let i = 0; i < 100; i++) it.next();
+      // Trim oldest 100 entries
+      const keep = new Set<string>();
+      for (const v of it) keep.add(v);
+      seenMsgIdsRef.current = keep;
+    }
+    seenMsgIdsRef.current.add(id);
+    return true;
+  }, []);
+
   const otherParticipantByConvId = useMemo(() => {
     const m = new Map<string, User | undefined>();
     const uid = user?._id;
@@ -64,24 +86,10 @@ export default function Chat() {
   }, [conversations, user?._id]);
 
   const scrollMessagesToBottom = useCallback(() => {
-    const el = messagesScrollRef.current;
-    if (!el) return;
-    
-    // Native smooth scroll can misbehave across fast updates.
-    // Setting scrollTop is highly reliable.
-    el.scrollTop = el.scrollHeight;
-
     requestAnimationFrame(() => {
-      if (messagesScrollRef.current) {
-        messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
-      }
+      const el = messagesScrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     });
-
-    setTimeout(() => {
-      if (messagesScrollRef.current) {
-        messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
-      }
-    }, 100);
   }, []);
 
   useLayoutEffect(() => {
@@ -123,6 +131,7 @@ export default function Chat() {
     })();
 
     return () => ac.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id]);
 
   // Merge conversation opened from Job Detail (API response) before list refetch completes
@@ -149,6 +158,7 @@ export default function Chat() {
     void messagesApi.getConversations().then((r) => {
       setConversations(r.data.data ?? []);
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, loadingConvs, conversationsById, user?._id]);
 
   // Select conversation from URL param (O(1) map lookup)
@@ -184,8 +194,7 @@ export default function Chat() {
         if (signal.aborted) return;
         const msgs = r.data.data ?? [];
         setMessages(msgs);
-        // Track loaded message IDs to prevent socket duplicates
-        for (const m of msgs) seenMsgIdsRef.current.add(m._id);
+        for (const m of msgs) trackSeenId(m._id);
         // Auto-mark as read immediately when opening a conversation
         void messagesApi.markRead(convId).then(() => refreshUnread()).catch(() => {});
         // Clear the unread badge for this conversation in the sidebar
@@ -202,9 +211,10 @@ export default function Chat() {
     })();
 
     return () => ac.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConv?._id]);
 
-  // Socket event listeners — uses the shared socket from SocketContext
+  // Socket event listeners — uses refs so this effect only re-runs when socket/user changes
   useEffect(() => {
     if (!socket) return;
 
@@ -212,17 +222,16 @@ export default function Chat() {
       if (!msg?._id) return;
 
       // Deduplicate: skip if we've already processed this message ID
-      if (seenMsgIdsRef.current.has(msg._id)) return;
-      seenMsgIdsRef.current.add(msg._id);
+      if (!trackSeenId(msg._id)) return;
 
       const convId =
         typeof msg.conversation === 'string'
           ? msg.conversation
           : String((msg.conversation as { _id?: string })?._id ?? msg.conversation);
 
-      const isActive = activeConv && String(activeConv._id) === String(convId);
+      const currentActiveConv = activeConvRef.current;
+      const isActive = currentActiveConv && String(currentActiveConv._id) === String(convId);
 
-      // Only append into the message pane if we're currently viewing this thread.
       if (isActive) {
         setMessages((prev) => {
           // Remove optimistic placeholder if it matches
@@ -234,18 +243,20 @@ export default function Chat() {
                 m.content === msg.content
               ),
           );
+          // Prevent true duplicates (same _id already in the array)
+          if (filtered.some((m) => m._id === msg._id)) return filtered;
           return [...filtered, msg];
         });
-        
-        // Auto-seen: immediately mark as read when the chat is open
+
         if (msg.sender._id !== user?._id) {
           void messagesApi.markRead(convId).then(() => refreshUnread());
         }
 
-        // Clear unread badge for the active conversation
         setConversations((prev) =>
           prev.map(c => String(c._id) === String(convId) ? { ...c, unreadCount: 0 } : c)
         );
+
+        stickToBottomRef.current = true;
       }
 
       setConversations((prev) => {
@@ -256,8 +267,7 @@ export default function Chat() {
         return list;
       });
 
-      // If this message belongs to a conversation not in our list yet, refetch once.
-      if (!conversationsById.has(String(convId))) {
+      if (!conversationsByIdRef.current.has(String(convId))) {
         void messagesApi.getConversations().then((r) => {
           setConversations(r.data.data ?? []);
         }).catch(() => {});
@@ -299,9 +309,6 @@ export default function Chat() {
       });
     };
 
-    socket.on('receive_message', handleMessage);
-    socket.on('connect', handleReconnect);
-    socket.on('typing', handleTyping);
     const handleConvoHidden = ({ _id }: { _id: string }) => {
       setConversations((prev) => prev.filter((c) => c._id !== _id));
       setActiveConv((prev) => {
@@ -314,17 +321,19 @@ export default function Chat() {
       refreshUnread();
     };
 
-    socket.on('conversation:deleted', handleConvoDeleted);
-    socket.on('conversation:hidden', handleConvoHidden);
-    socket.on('conversation:new', handleConversationNew);
-
-    // Messages read by the other person → update our messages as "read"
     const handleMessagesRead = ({ conversationId }: { conversationId: string }) => {
-      if (activeConv && String(activeConv._id) === conversationId) {
+      const cur = activeConvRef.current;
+      if (cur && String(cur._id) === conversationId) {
         setMessages((prev) => prev.map((m) => m.sender._id === user?._id ? { ...m, read: true } : m));
       }
     };
 
+    socket.on('receive_message', handleMessage);
+    socket.on('connect', handleReconnect);
+    socket.on('typing', handleTyping);
+    socket.on('conversation:deleted', handleConvoDeleted);
+    socket.on('conversation:hidden', handleConvoHidden);
+    socket.on('conversation:new', handleConversationNew);
     socket.on('messages:read', handleMessagesRead);
 
     return () => {
@@ -336,18 +345,19 @@ export default function Chat() {
       socket.off('conversation:new', handleConversationNew);
       socket.off('messages:read', handleMessagesRead);
     };
-  }, [socket, user?._id, navigate, refreshUnread, activeConv, conversationsById]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, user?._id, navigate, refreshUnread, trackSeenId]);
 
   // Stable key of other-participant IDs so presence polling only re-runs when the
   // set of chat partners actually changes (not on every message / unread bump).
   const otherParticipantIdsKey = useMemo(() => {
     if (!user) return '';
-    const ids: string[] = [];
+    const ids = new Set<string>();
     for (const conv of conversations) {
       const other = conv.participants?.find((p) => p._id !== user._id);
-      if (other?._id && !ids.includes(other._id)) ids.push(other._id);
+      if (other?._id) ids.add(other._id);
     }
-    return ids.sort().join(',');
+    return [...ids].sort().join(',');
   }, [conversations, user]);
 
   // On-demand online-presence polling via get_online_status (replaces removed user:online/user:offline broadcasts)

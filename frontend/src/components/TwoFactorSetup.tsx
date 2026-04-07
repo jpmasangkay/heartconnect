@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Mail, CheckCircle } from 'lucide-react';
 import { twoFactorApi } from '../api';
+import { getAxiosErrorMessage } from '../lib/utils';
 import { Input } from './ui/forms';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -23,8 +24,8 @@ export default function TwoFactorSetup() {
       await twoFactorApi.setup('email');
       updateUser({ twoFactorEnabled: true, twoFactorMethod: 'email' });
       setSuccess('2FA via email enabled!');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Setup failed');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Setup failed'));
     } finally {
       setLoading(false);
     }
@@ -41,8 +42,8 @@ export default function TwoFactorSetup() {
       setSuccess('2FA disabled');
       setStep('choice');
       setPassword('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to disable');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Failed to disable'));
     } finally {
       setLoading(false);
     }
