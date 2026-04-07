@@ -1,115 +1,61 @@
 const router  = require('express').Router();
-const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
 const bcrypt  = require('bcryptjs');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
-const { COOKIE_NAME } = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
 const { sanitizeUser, escapeHtml } = require('../services/sanitize');
+const { signToken, signTempToken, setTokenCookie, clearTokenCookie } = require('../services/token');
+const { registerSchema, profileUpdateSchema, validate } = require('../middleware/schemas');
 
-// Pre-hashed dummy to prevent timing side-channel on user-not-found
-const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
-
-const isProd = process.env.NODE_ENV === 'production';
-
-const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d',
-    issuer: 'heartconnect',
-    audience: 'heartconnect-api',
-  });
-
-function setTokenCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
+// Lazy-initialized dummy hash to prevent timing side-channel on user-not-found
+let _dummyHash = null;
+async function getDummyHash() {
+  if (!_dummyHash) _dummyHash = await bcrypt.hash('dummy-password-for-timing', 10);
+  return _dummyHash;
 }
 
-function clearTokenCookie(res) {
-  res.clearCookie(COOKIE_NAME, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    path: '/',
-  });
-}
-
-const signTempToken = (id) =>
-  jwt.sign({ id, requires2FA: true }, process.env.JWT_SECRET, {
-    expiresIn: '5m',
-    issuer: 'heartconnect',
-    audience: 'heartconnect-api',
-  });
-
-// Password complexity validation
 const validatePasswordStrength = (password) => {
   const errors = [];
-  
-  if (password.length < 12) {
-    errors.push('Password must be at least 12 characters');
-  }
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain lowercase letters');
-  }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain uppercase letters');
-  }
-  if (!/\d/.test(password)) {
-    errors.push('Password must contain numbers');
-  }
-  if (!/[@$!%*?&]/.test(password)) {
-    errors.push('Password must contain special characters (@$!%*?&)');
-  }
-  
+  if (password.length < 12) errors.push('Password must be at least 12 characters');
+  if (!/[a-z]/.test(password)) errors.push('Password must contain lowercase letters');
+  if (!/[A-Z]/.test(password)) errors.push('Password must contain uppercase letters');
+  if (!/\d/.test(password)) errors.push('Password must contain numbers');
+  if (!/[@$!%*?&]/.test(password)) errors.push('Password must contain special characters (@$!%*?&)');
   return { valid: errors.length === 0, errors };
 };
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, university, agreedToTerms } = req.body;
-
-    // Must agree to terms
-    if (!agreedToTerms) {
-      return res.status(400).json({ message: 'You must agree to the Terms of Service and Privacy Policy' });
+    const parsed = validate(registerSchema, req.body);
+    if (!parsed.valid) {
+      return res.status(400).json({ errors: parsed.errors });
     }
 
-    // Prevent self-registration as admin
-    if (!role || !['student', 'client'].includes(role)) {
-      return res.status(400).json({ message: 'Role must be either student or client' });
-    }
-    
+    const { name, email, password, role, university } = parsed.data;
+
     if (!password || typeof password !== 'string') {
       return res.status(400).json({ message: 'Password is required' });
     }
 
-    // Validate password strength
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.valid) {
       return res.status(400).json({ errors: passwordValidation.errors });
     }
-    
+
     if (await User.findOne({ email }))
       return res.status(400).json({ message: 'Email already in use' });
 
-    // Whitelist fields — prevents mass-assignment of sensitive fields
-    // (isBanned, isVerified, twoFactorEnabled, etc.)
-    const allowed = ['name', 'email', 'password', 'role', 'university'];
-    const safeData = Object.fromEntries(
-      Object.entries({ name, email, password, role, university }).filter(([k]) => allowed.includes(k))
-    );
+    const safeData = { name, email, password, role };
+    if (university) safeData.university = university;
+
     const user  = await User.create({ ...safeData, agreedToTerms: true, agreedToTermsAt: new Date() });
-    const token = signToken(user._id);
+    const token = signToken(user._id, user.tokenVersion);
     setTokenCookie(res, token);
     res.status(201).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     console.error('Registration error:', err);
-    // Return Mongoose validation errors if available
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(e => e.message);
       return res.status(400).json({ errors: messages });
@@ -135,57 +81,66 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email }).select('+password +_email2FACode +_email2FACodeExpires');
 
     if (!user) {
-      // Constant-time: always run a bcrypt compare to prevent timing side-channel
-      await bcrypt.compare(password, DUMMY_HASH);
+      await bcrypt.compare(password, await getDummyHash());
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
+
     // Check if account is locked
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000);
-      return res.status(429).json({ 
-        message: `Account locked. Try again in ${minutesLeft} minutes.` 
+      return res.status(429).json({
+        message: `Account locked. Try again in ${minutesLeft} minutes.`
       });
     }
-    
+
+    // B2: Reset failed attempts when lock has expired (persist to DB before password check)
+    if (user.lockedUntil && user.lockedUntil <= new Date()) {
+      await User.updateOne({ _id: user._id }, { failedAttempts: 0, $unset: { lockedUntil: 1 } });
+    }
+
     // Check password
     if (!(await user.matchPassword(password))) {
-      // Increment failed attempts
-      user.failedAttempts = (user.failedAttempts || 0) + 1;
-      
-      // Lock account after 5 failed attempts
-      if (user.failedAttempts >= 5) {
-        user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-        await user.save();
-        return res.status(429).json({ 
-          message: 'Too many failed attempts. Account locked for 30 minutes.' 
+      // B4: Atomic increment to avoid race conditions
+      const updated = await User.findOneAndUpdate(
+        { _id: user._id },
+        { $inc: { failedAttempts: 1 } },
+        { new: true }
+      );
+
+      if (updated.failedAttempts >= 5) {
+        await User.updateOne(
+          { _id: user._id },
+          { lockedUntil: new Date(Date.now() + 30 * 60 * 1000) }
+        );
+        return res.status(429).json({
+          message: 'Too many failed attempts. Account locked for 30 minutes.'
         });
       }
-      
-      await user.save();
+
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
-    // Reset failed attempts on successful login
-    user.failedAttempts = 0;
-    user.lockedUntil = undefined;
-    await user.save();
+
+    // L2: Reset failed attempts fire-and-forget on successful login
+    User.updateOne(
+      { _id: user._id },
+      { failedAttempts: 0, $unset: { lockedUntil: 1 } }
+    ).catch(() => {});
 
     // If 2FA is enabled, return temp token and require 2FA verification
     if (user.twoFactorEnabled) {
       const tempToken = signTempToken(user._id);
 
-      // If email 2FA, auto-send the code
+      // If email 2FA, auto-send the code (L1: fire-and-forget)
       if (user.twoFactorMethod === 'email') {
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const code = crypto.randomInt(100000, 999999).toString();
         user._email2FACode = crypto.createHash('sha256').update(code).digest('hex');
         user._email2FACodeExpires = new Date(Date.now() + 5 * 60 * 1000);
         await user.save();
-        await sendEmail(
+        sendEmail(
           user.email,
           'HeartConnect - Your Login Code',
           `<h2>Your verification code</h2><p>Use this code to complete your login:</p><h1 style="letter-spacing:4px;font-size:32px;">${code}</h1><p>This code expires in 5 minutes.</p>`
-        );
+        ).catch((err) => console.error('2FA email error:', err));
       }
 
       return res.json({
@@ -195,7 +150,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const token = signToken(user._id);
+    const token = signToken(user._id, user.tokenVersion);
     setTokenCookie(res, token);
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
@@ -203,48 +158,56 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me — returns user data + a short-lived token for socket handshake
+// GET /api/auth/me
 router.get('/me', protect, (req, res) => {
-  const socketToken = signToken(req.user._id);
+  const socketToken = signToken(req.user._id, req.user.tokenVersion);
   res.json({ ...sanitizeUser(req.user), socketToken });
 });
 
-// PUT /api/auth/profile
+// PUT /api/auth/profile (P4: Zod-validated, C4: sanitizeUser)
 router.put('/profile', protect, async (req, res) => {
   try {
-    const allowed = ['name','avatar','bio','skills','location','university','portfolio'];
-    const updates = Object.fromEntries(
-      Object.entries(req.body).filter(([k]) => allowed.includes(k))
-    );
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-password -twoFactorSecret -resetPasswordToken -resetPasswordExpires');
-    res.json(user);
+    const parsed = validate(profileUpdateSchema, req.body);
+    if (!parsed.valid) {
+      return res.status(400).json({ errors: parsed.errors });
+    }
+    const user = await User.findByIdAndUpdate(req.user._id, parsed.data, { new: true, runValidators: true });
+    res.json(sanitizeUser(user));
   } catch (err) {
     res.status(400).json({ message: 'Failed to update profile' });
   }
 });
 
-// PUT /api/auth/password
+// PUT /api/auth/password (B1: select +password, B6: guard undefined, S6: bump tokenVersion)
 router.put('/password', protect, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
-    // Validate new password strength
+
+    if (!newPassword || typeof newPassword !== 'string') {
+      return res.status(400).json({ message: 'New password is required' });
+    }
+    if (!currentPassword || typeof currentPassword !== 'string') {
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+
     const passwordValidation = validatePasswordStrength(newPassword);
     if (!passwordValidation.valid) {
       return res.status(400).json({ errors: passwordValidation.errors });
     }
-    
-    const user = await User.findById(req.user._id);
+
+    const user = await User.findById(req.user._id).select('+password');
     if (!(await user.matchPassword(currentPassword)))
       return res.status(400).json({ message: 'Incorrect current password' });
 
     user.password = newPassword;
-    // Invalidate all existing tokens by resetting user
     user.failedAttempts = 0;
     user.lockedUntil = undefined;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save();
-    
-    res.json({ message: 'Password updated. Please login again.' });
+
+    const token = signToken(user._id, user.tokenVersion);
+    setTokenCookie(res, token);
+    res.json({ message: 'Password updated successfully.', token });
   } catch (err) {
     res.status(400).json({ message: 'Failed to change password' });
   }
@@ -263,13 +226,11 @@ router.post('/forgot-password', async (req, res) => {
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
     const user = await User.findOne({ email: email.trim().toLowerCase() });
-    // Always return success to prevent email enumeration
     if (!user) return res.json({ message: 'If an account exists with that email, a reset link has been sent.' });
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
     await user.save();
 
     const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
@@ -290,7 +251,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// POST /api/auth/reset-password
+// POST /api/auth/reset-password (S6: bump tokenVersion)
 router.post('/reset-password', async (req, res) => {
   try {
     const { token, password } = req.body;
@@ -318,6 +279,7 @@ router.post('/reset-password', async (req, res) => {
     user.resetPasswordExpires = undefined;
     user.failedAttempts = 0;
     user.lockedUntil = undefined;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save();
 
     res.json({ message: 'Password reset successful. You can now login.' });
@@ -326,26 +288,27 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// PATCH /api/auth/onboarding-complete
+// PATCH /api/auth/onboarding-complete (C4: sanitizeUser)
 router.patch('/onboarding-complete', protect, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { hasCompletedOnboarding: true },
       { new: true }
-    ).select('-password -twoFactorSecret -resetPasswordToken -resetPasswordExpires');
-    res.json(user);
+    );
+    res.json(sanitizeUser(user));
   } catch (err) {
     res.status(500).json({ message: 'Failed to update onboarding status' });
   }
 });
 
-// GET /api/auth/users/:id  (public profile)
+// GET /api/auth/users/:id  (public profile, L4: cache header)
 router.get('/users/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
       .select('name role university bio skills location portfolio createdAt isVerified verificationStatus');
     if (!user) return res.status(404).json({ message: 'User not found' });
+    res.set('Cache-Control', 'public, max-age=60');
     res.json(user);
   } catch {
     res.status(400).json({ message: 'Invalid user ID' });

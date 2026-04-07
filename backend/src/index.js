@@ -81,10 +81,10 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '..', 'uploads')));
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+// ─── CORS (S2: reject null origin in production) ─────────────────────────────
 const corsOrigin = isProd
   ? (origin, cb) => {
-      if (!origin) return cb(null, true);
+      if (!origin) return cb(new Error('Origin header required'));
       if (clientUrls.includes(origin)) return cb(null, true);
       cb(new Error('Not allowed by CORS'));
     }
@@ -96,6 +96,23 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
+
+// ─── CSRF Origin Validation (S1) ─────────────────────────────────────────────
+// For state-changing requests, verify Origin/Referer matches allowed clients
+if (isProd) {
+  const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+  app.use((req, res, next) => {
+    if (SAFE_METHODS.has(req.method)) return next();
+    const origin = req.headers.origin || '';
+    const referer = req.headers.referer || '';
+    if (clientUrls.some((u) => origin === u || referer.startsWith(u + '/'))) {
+      return next();
+    }
+    // Allow requests with a valid Bearer token but no origin (API clients)
+    if (req.headers.authorization?.startsWith('Bearer ')) return next();
+    return res.status(403).json({ message: 'Forbidden: origin not allowed' });
+  });
+}
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const generalLimiter = rateLimit({
@@ -130,6 +147,7 @@ app.use(generalLimiter);
 app.use(logSecurityEvent);
 
 // ─── REST Routes ──────────────────────────────────────────────────────────────
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);

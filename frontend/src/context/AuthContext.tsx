@@ -6,13 +6,13 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { authApi } from '../api';
+import { authApi, setApiToken } from '../api';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import type { User, LoginCredentials, RegisterData, LoginResponse } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  /** In-memory token used exclusively for Socket.io handshake. Never stored in localStorage. */
+  /** Auth token — persisted in localStorage for cross-site auth, also used for Socket.io handshake. */
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         await waitMinSkeletonMs(t0, signal);
         if (signal.aborted) return;
+        setApiToken(null);
         setUser(null);
         setToken(null);
       } finally {
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data;
     }
 
+    setApiToken(data.token || null);
     setToken(data.token || null);
     setUser(data.user || null);
     return data;
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (data: RegisterData) => {
     const res = await authApi.register(data);
     const { token: t, user: u } = res.data;
+    setApiToken(t);
     setToken(t);
     setUser(u);
   }, []);
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore — cookie may already be expired
     }
+    setApiToken(null);
     setToken(null);
     setUser(null);
   }, []);

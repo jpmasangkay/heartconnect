@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   // Account security
   failedAttempts: { type: Number, default: 0 },
   lockedUntil:    { type: Date },
+  tokenVersion:   { type: Number, default: 0 },
 
   // Two-Factor Authentication
   twoFactorEnabled: { type: Boolean, default: false },
@@ -54,6 +55,7 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.index({ role: 1, verificationStatus: 1 });
+userSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

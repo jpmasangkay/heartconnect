@@ -5,7 +5,7 @@ import axios from 'axios';
 import { getAxiosErrorMessage } from '../lib/utils';
 import { Input, FormField } from '../components/ui/forms';
 import { useAuth } from '../context/AuthContext';
-import { twoFactorApi } from '../api';
+import { twoFactorApi, setApiToken } from '../api';
 
 export default function Login() {
   const { login, isAuthenticated, isLoading, user } = useAuth();
@@ -86,8 +86,8 @@ export default function Login() {
     setError('');
     setCodeLoading(true);
     try {
-      await twoFactorApi.verify(tempToken, code);
-      // Cookie is now set by the server; reload to re-initialize AuthContext
+      const res = await twoFactorApi.verify(tempToken, code);
+      setApiToken(res.data.token);
       window.location.replace(from);
     } catch (err: unknown) {
       setError(getAxiosErrorMessage(err, 'Invalid code. Try again.'));

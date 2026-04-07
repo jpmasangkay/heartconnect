@@ -12,6 +12,9 @@ const SENSITIVE_FIELDS = [
   'resetPasswordExpires',
   '_email2FACode',
   '_email2FACodeExpires',
+  'failedAttempts',
+  'lockedUntil',
+  'tokenVersion',
   '__v',
 ];
 

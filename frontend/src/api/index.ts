@@ -17,11 +17,32 @@ import type {
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const TOKEN_KEY = 'hc_auth_token';
+
+let _token: string | null = localStorage.getItem(TOKEN_KEY);
+
+export function setApiToken(token: string | null) {
+  _token = token;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getApiToken() {
+  return _token;
+}
 
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
+});
+
+// Attach Bearer token so auth works even when cross-site cookies are blocked
+api.interceptors.request.use((config) => {
+  if (_token) {
+    config.headers.Authorization = `Bearer ${_token}`;
+  }
+  return config;
 });
 
 // Redirect on 401 (but not for /auth/* endpoints which manage their own UX)
@@ -39,6 +60,7 @@ api.interceptors.response.use(
       url.includes('auth/reset-password') ||
       url.includes('auth/2fa');
     if (error.response?.status === 401 && !isAuthRoute) {
+      setApiToken(null);
       window.location.replace('/login');
     }
     return Promise.reject(error);
@@ -61,7 +83,7 @@ export const authApi = {
     api.put<User>('/auth/profile', data),
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.put('/auth/password', data),
+    api.put<{ message: string; token: string }>('/auth/password', data),
 
   logout: () => api.post('/auth/logout', {}),
 

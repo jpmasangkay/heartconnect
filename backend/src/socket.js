@@ -101,7 +101,7 @@ function setupSocket(server, opts = {}) {
       callback({ online: isOnline, lastSeen });
     });
 
-    // Receive and broadcast a message
+    // Receive and broadcast a message (P1: parallelized queries)
     socket.on('send_message', async ({ conversationId, content }) => {
       try {
         if (isSocketRateLimited(socket.id)) return;
@@ -109,22 +109,25 @@ function setupSocket(server, opts = {}) {
         if (!content || typeof content !== 'string' || !content.trim() || content.length > 5000) return;
         const safeContent = content.trim();
         const convId = String(conversationId);
-        const convo = await Conversation.findById(convId);
         const uid = String(socket.userId);
+
+        const convo = await Conversation.findById(convId);
         if (!convo || !convo.participants.map((p) => String(p)).includes(uid)) return;
 
-        const sender = await User.findById(socket.userId);
-        if (sender?.isBanned) return;
         const otherParticipant = convo.participants.find((p) => String(p) !== uid);
+        const [sender, other] = await Promise.all([
+          User.findById(socket.userId),
+          otherParticipant ? User.findById(otherParticipant) : null,
+        ]);
+
+        if (sender?.isBanned) return;
         if (otherParticipant) {
-          const other = await User.findById(otherParticipant);
           if (sender?.blockedUsers?.map(String).includes(String(otherParticipant)) ||
               other?.blockedUsers?.map(String).includes(uid)) {
             return;
           }
         }
 
-        // Spam check
         const spamResult = checkSpam(uid, safeContent);
         if (spamResult.blocked) {
           socket.emit('message_error', { message: spamResult.reason });
@@ -138,12 +141,10 @@ function setupSocket(server, opts = {}) {
         });
         await msg.populate('sender', 'name avatar');
 
-        // Update conversation's lastMessage
         convo.lastMessage = msg._id;
         if (convo.hiddenFor?.length) convo.hiddenFor = [];
         await convo.save();
 
-        // Broadcast to participant user rooms only
         for (const pid of convo.participants) {
           io.to(`user:${String(pid)}`).emit('receive_message', msg);
         }

@@ -1,33 +1,39 @@
 const router  = require('express').Router();
+const crypto  = require('crypto');
+const jwt     = require('jsonwebtoken');
 const { authenticator } = require('otplib');
 const QRCode  = require('qrcode');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
-const { COOKIE_NAME } = require('../middleware/auth');
-const jwt     = require('jsonwebtoken');
 const { sendEmail } = require('../services/email');
 const { sanitizeUser } = require('../services/sanitize');
+const { signToken, setTokenCookie } = require('../services/token');
 
-const isProd = process.env.NODE_ENV === 'production';
+// Per-token 2FA attempt tracking (S5: brute-force protection)
+const twoFAAttempts = new Map();
+const MAX_2FA_ATTEMPTS = 5;
 
-const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d',
-    issuer: 'heartconnect',
-    audience: 'heartconnect-api',
-  });
+setInterval(() => {
+  const cutoff = Date.now() - 5 * 60 * 1000;
+  for (const [key, entry] of twoFAAttempts) {
+    if (entry.ts < cutoff) twoFAAttempts.delete(key);
+  }
+}, 60000).unref();
 
-function setTokenCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/',
-  });
+function check2FAAttempts(tokenKey) {
+  const entry = twoFAAttempts.get(tokenKey);
+  if (entry && entry.count >= MAX_2FA_ATTEMPTS) return false;
+  return true;
 }
 
-// POST /api/auth/2fa/setup  — generate secret + QR code
+function record2FAFailure(tokenKey) {
+  const entry = twoFAAttempts.get(tokenKey) || { count: 0, ts: Date.now() };
+  entry.count += 1;
+  entry.ts = Date.now();
+  twoFAAttempts.set(tokenKey, entry);
+}
+
+// POST /api/auth/2fa/setup  — generate secret + QR code (C3: email 2FA sends verification code first)
 router.post('/setup', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('+twoFactorSecret');
@@ -35,21 +41,28 @@ router.post('/setup', protect, async (req, res) => {
       return res.status(400).json({ message: '2FA is already enabled' });
     }
 
-    const { method } = req.body; // 'totp' or 'email'
+    const { method } = req.body;
 
     if (method === 'email') {
+      const code = crypto.randomInt(100000, 999999).toString();
+      user._email2FACode = crypto.createHash('sha256').update(code).digest('hex');
+      user._email2FACodeExpires = new Date(Date.now() + 5 * 60 * 1000);
       user.twoFactorMethod = 'email';
-      user.twoFactorEnabled = true;
-      user.twoFactorSecret = undefined;
       await user.save();
-      return res.json({ message: '2FA via email enabled', method: 'email' });
+
+      await sendEmail(
+        user.email,
+        'HeartConnect - Verify Email 2FA Setup',
+        `<h2>Confirm Email 2FA</h2><p>Enter this code to enable email-based two-factor authentication:</p><h1 style="letter-spacing:4px;font-size:32px;">${code}</h1><p>This code expires in 5 minutes.</p>`
+      );
+
+      return res.json({ message: 'Verification code sent to your email. Enter it to enable 2FA.', method: 'email', requiresVerification: true });
     }
 
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(user.email, 'HeartConnect', secret);
     const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
-    // Store secret temporarily (not enabled until verified)
     user.twoFactorSecret = secret;
     user.twoFactorMethod = 'totp';
     await user.save();
@@ -60,11 +73,23 @@ router.post('/setup', protect, async (req, res) => {
   }
 });
 
-// POST /api/auth/2fa/verify-setup  — verify first code and enable 2FA
+// POST /api/auth/2fa/verify-setup  — verify first code and enable 2FA (handles both TOTP and email)
 router.post('/verify-setup', protect, async (req, res) => {
   try {
     const { code } = req.body;
-    const user = await User.findById(req.user._id).select('+twoFactorSecret');
+    const user = await User.findById(req.user._id).select('+twoFactorSecret +_email2FACode +_email2FACodeExpires');
+
+    if (user.twoFactorMethod === 'email') {
+      const hashedInput = crypto.createHash('sha256').update(code).digest('hex');
+      if (!user._email2FACode || !user._email2FACodeExpires || user._email2FACodeExpires < new Date() || user._email2FACode !== hashedInput) {
+        return res.status(400).json({ message: 'Invalid or expired verification code' });
+      }
+      user.twoFactorEnabled = true;
+      user._email2FACode = undefined;
+      user._email2FACodeExpires = undefined;
+      await user.save();
+      return res.json({ message: '2FA via email enabled successfully' });
+    }
 
     if (!user.twoFactorSecret) {
       return res.status(400).json({ message: 'No 2FA setup in progress' });
@@ -84,12 +109,11 @@ router.post('/verify-setup', protect, async (req, res) => {
   }
 });
 
-// POST /api/auth/2fa/verify  — verify code during login
+// POST /api/auth/2fa/verify  — verify code during login (S5: per-token brute-force protection)
 router.post('/verify', async (req, res) => {
   try {
     const { tempToken, code } = req.body;
 
-    // Decode temp token (short-lived, 5 min)
     let decoded;
     try {
       decoded = jwt.verify(tempToken, process.env.JWT_SECRET, { issuer: 'heartconnect', audience: 'heartconnect-api' });
@@ -101,6 +125,11 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Invalid token' });
     }
 
+    const tokenKey = `${decoded.id}:${decoded.iat}`;
+    if (!check2FAAttempts(tokenKey)) {
+      return res.status(429).json({ message: 'Too many failed attempts. Please login again.' });
+    }
+
     const user = await User.findById(decoded.id).select('+twoFactorSecret +_email2FACode +_email2FACodeExpires');
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ message: 'Invalid request' });
@@ -109,22 +138,21 @@ router.post('/verify', async (req, res) => {
     if (user.twoFactorMethod === 'totp') {
       const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
       if (!isValid) {
+        record2FAFailure(tokenKey);
         return res.status(400).json({ message: 'Invalid verification code' });
       }
     } else if (user.twoFactorMethod === 'email') {
-      // For email 2FA, validate with the stored temp code (hashed)
-      const hashedInput = require('crypto').createHash('sha256').update(code).digest('hex');
+      const hashedInput = crypto.createHash('sha256').update(code).digest('hex');
       if (!user._email2FACode || !user._email2FACodeExpires || user._email2FACodeExpires < new Date() || user._email2FACode !== hashedInput) {
+        record2FAFailure(tokenKey);
         return res.status(400).json({ message: 'Invalid or expired verification code' });
       }
-      // Clear used code
       user._email2FACode = undefined;
       user._email2FACodeExpires = undefined;
       await user.save();
     }
 
-    // Issue full token and set httpOnly cookie
-    const token = signToken(user._id);
+    const token = signToken(user._id, user.tokenVersion);
     setTokenCookie(res, token);
     res.json({ token, user: sanitizeUser(user) });
   } catch (err) {
@@ -132,7 +160,7 @@ router.post('/verify', async (req, res) => {
   }
 });
 
-// POST /api/auth/2fa/disable  — disable 2FA
+// POST /api/auth/2fa/disable
 router.post('/disable', protect, async (req, res) => {
   try {
     const { password, code } = req.body;
@@ -160,7 +188,7 @@ router.post('/disable', protect, async (req, res) => {
   }
 });
 
-// POST /api/auth/2fa/send-email-code  — send 2FA code via email (for email method)
+// POST /api/auth/2fa/send-email-code (B3: crypto.randomInt)
 router.post('/send-email-code', async (req, res) => {
   try {
     const { tempToken } = req.body;
@@ -176,9 +204,8 @@ router.post('/send-email-code', async (req, res) => {
       return res.status(400).json({ message: 'Invalid request' });
     }
 
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    user._email2FACode = require('crypto').createHash('sha256').update(code).digest('hex');
+    const code = crypto.randomInt(100000, 999999).toString();
+    user._email2FACode = crypto.createHash('sha256').update(code).digest('hex');
     user._email2FACodeExpires = new Date(Date.now() + 5 * 60 * 1000);
     await user.save();
 

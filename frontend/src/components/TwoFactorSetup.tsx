@@ -8,24 +8,40 @@ import { useAuth } from '../context/AuthContext';
 
 export default function TwoFactorSetup() {
   const { user, updateUser } = useAuth();
-  const [step, setStep] = useState<'choice' | 'totp-setup' | 'verify' | 'disable'>('choice');
+  const [step, setStep] = useState<'choice' | 'totp-setup' | 'verify' | 'email-verify' | 'disable'>('choice');
   const [password, setPassword] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const isEnabled = user?.twoFactorEnabled;
 
-
   const handleSetupEmail = async () => {
     setError('');
     setLoading(true);
     try {
       await twoFactorApi.setup('email');
-      updateUser({ twoFactorEnabled: true, twoFactorMethod: 'email' });
-      setSuccess('2FA via email enabled!');
+      setStep('email-verify');
     } catch (err: unknown) {
       setError(getAxiosErrorMessage(err, 'Setup failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyEmailSetup = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await twoFactorApi.verifySetup(emailCode);
+      updateUser({ twoFactorEnabled: true, twoFactorMethod: 'email' });
+      setSuccess('2FA via email enabled!');
+      setStep('choice');
+      setEmailCode('');
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, 'Invalid code'));
     } finally {
       setLoading(false);
     }
@@ -95,6 +111,31 @@ export default function TwoFactorSetup() {
         </div>
       )}
 
+
+      {step === 'email-verify' && (
+        <form onSubmit={handleVerifyEmailSetup}>
+          <p className="text-xs text-stone-muted mb-3">
+            A verification code was sent to your email. Enter it below to enable 2FA:
+          </p>
+          <Input
+            type="text"
+            placeholder="6-digit code"
+            value={emailCode}
+            onChange={(e) => setEmailCode(e.target.value)}
+            maxLength={6}
+            className="mb-2 text-center tracking-[0.3em]"
+            autoFocus
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={loading || emailCode.length !== 6}>
+              {loading ? 'Verifying...' : 'Verify & Enable'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { setStep('choice'); setEmailCode(''); setError(''); }}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
 
       {step === 'disable' && (
         <form onSubmit={handleDisable}>

@@ -18,11 +18,22 @@ const ALLOWED_FILE_TYPES  = [
   'application/zip',
 ];
 
+const MIME_TO_EXT = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/zip': '.zip',
+};
+
 // Chat attachments (images + documents, max 5 MB)
 const chatStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(UPLOAD_ROOT, 'chat')),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = MIME_TO_EXT[file.mimetype] || path.extname(file.originalname);
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
   },
 });
@@ -43,7 +54,7 @@ const chatUpload = multer({
 const verificationStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(UPLOAD_ROOT, 'verification')),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = MIME_TO_EXT[file.mimetype] || path.extname(file.originalname);
     cb(null, `${req.user._id}-${Date.now()}${ext}`);
   },
 });

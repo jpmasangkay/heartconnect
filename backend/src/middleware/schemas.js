@@ -57,6 +57,29 @@ const reviewSchema = z.object({
   comment: z.string().max(2000).optional(),
 });
 
+// ─── Registration ────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const registerSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  email: z.string().trim().toLowerCase().refine((v) => EMAIL_RE.test(v), 'Invalid email address'),
+  password: z.string().min(12, 'Password must be at least 12 characters'),
+  role: z.enum(['student', 'client'], { message: 'Role must be student or client' }),
+  university: z.string().trim().max(200).optional(),
+  agreedToTerms: z.literal(true, { message: 'You must agree to the Terms of Service and Privacy Policy' }),
+});
+
+// ─── Profile Update ──────────────────────────────────────────────────────────
+const profileUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  avatar: z.string().max(2000).optional(),
+  bio: z.string().max(2000).optional(),
+  skills: z.array(z.string().trim().min(1).max(50)).max(30).optional(),
+  location: z.string().trim().max(200).optional(),
+  university: z.string().trim().max(200).optional(),
+  portfolio: z.string().trim().max(500).optional(),
+}).strict();
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -82,6 +105,8 @@ module.exports = {
   messageSchema,
   reportSchema,
   reviewSchema,
+  registerSchema,
+  profileUpdateSchema,
   validate,
   escapeRegex,
   JOB_STATUSES,
