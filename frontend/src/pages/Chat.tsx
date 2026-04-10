@@ -517,9 +517,9 @@ export default function Chat() {
   );
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-cream flex flex-col overflow-hidden">
-      <main className="flex-1 max-w-6xl mx-auto w-full p-2 md:p-4 overflow-hidden">
-        <div className="bg-white border border-stone-border rounded-sm overflow-hidden flex flex-col h-full">
+    <div className="h-[calc(100dvh-64px)] bg-cream flex flex-col overflow-hidden">
+      <main className="flex-1 max-w-6xl mx-auto w-full p-0 md:p-4 overflow-hidden">
+        <div className="bg-white border-0 md:border border-stone-border md:rounded-sm overflow-hidden flex flex-col h-full">
           {/* Reconnecting banner */}
           {reconnecting && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-xs text-amber-700 shrink-0">
@@ -631,7 +631,7 @@ export default function Chat() {
             ) : (
               <>
                 {/* Chat header */}
-                <div className="px-6 py-4 border-b border-stone-border flex items-center justify-between gap-3">
+                <div className="px-3 md:px-6 py-3 md:py-4 border-b border-stone-border flex items-center justify-between gap-2 md:gap-3">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => { setActiveConv(null); navigate('/chat'); }}
@@ -644,7 +644,7 @@ export default function Chat() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{otherFor(activeConv)?.name}</p>
-                      <p className="text-xs text-stone-muted truncate max-w-xs">
+                      <p className="text-xs text-stone-muted truncate max-w-[140px] md:max-w-xs">
                         {activeConv.job?.title ?? 'Job no longer available'}
                       </p>
                     </div>
@@ -668,7 +668,7 @@ export default function Chat() {
                     stickToBottomRef.current =
                       el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
                   }}
-                  className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+                  className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-4"
                 >
                   {loadingMsgs ? (
                     <div className="space-y-3 min-h-[120px]" aria-busy="true" aria-label="Loading messages">
@@ -692,7 +692,7 @@ export default function Chat() {
                         const isMe = msg.sender._id === user?._id;
                         return (
                           <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+                            <div className={`max-w-[85%] md:max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
                               {!isMe && (
                                 <span className="text-xs text-stone-muted ml-1">{msg.sender.name}</span>
                               )}
@@ -759,7 +759,7 @@ export default function Chat() {
                 {/* Typing + input — anchored to bottom so indicator sits by the textbox */}
                 <div className="shrink-0 border-t border-stone-border bg-white">
                   {isTyping && (
-                    <div className="px-6 pt-3 pb-1">
+                    <div className="px-3 md:px-6 pt-3 pb-1">
                       <div className="flex items-center gap-2 text-xs text-stone-muted">
                         <div className="flex gap-1" aria-hidden>
                           <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -770,10 +770,10 @@ export default function Chat() {
                       </div>
                     </div>
                   )}
-                  <div className={`px-6 ${isTyping ? 'pb-4 pt-1' : 'py-4'}`}>
+                  <div className={`px-3 md:px-6 ${isTyping ? 'pb-3 md:pb-4 pt-1' : 'py-3 md:py-4'}`}>
                   {/* File preview bar */}
                   {pendingFile && (
-                    <div className="flex items-center gap-2 px-6 py-2 bg-cream border-b border-stone-border">
+                    <div className="flex items-center gap-2 px-3 md:px-6 py-2 bg-cream border-b border-stone-border">
                       {pendingFile.type.startsWith('image/') ? (
                         <ImageIcon size={14} className="text-navy shrink-0" />
                       ) : (
@@ -791,7 +791,7 @@ export default function Chat() {
                       </button>
                     </div>
                   )}
-                  <form onSubmit={pendingFile ? (e) => { e.preventDefault(); handleSendFile(); } : handleSend} className="flex gap-3 items-center">
+                  <form onSubmit={pendingFile ? (e) => { e.preventDefault(); handleSendFile(); } : handleSend} className="flex gap-2 md:gap-3 items-center">
                     {/* Hidden file input */}
                     <input
                       type="file"
@@ -812,7 +812,7 @@ export default function Chat() {
                       value={input}
                       onChange={(e) => { setInput(e.target.value); handleTyping(); }}
                       placeholder={pendingFile ? 'Add a caption (optional)...' : 'Type a message...'}
-                      className="flex-1 bg-cream border border-stone-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-navy transition-colors"
+                      className="flex-1 min-w-0 bg-cream border border-stone-border rounded-lg px-3 md:px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-navy transition-colors"
                     />
                     <button
                       type="submit"
