@@ -4,17 +4,12 @@ export default function Footer() {
   return (
     <footer className="bg-cream border-t border-stone-border mt-24">
       {/* Trust strip */}
-      <div className="max-w-7xl mx-auto px-6 py-16 text-center">
-        <p className="text-sm text-stone-muted mb-10 tracking-wide">
-          Drop some names with confidence
-        </p>
-        <div className="flex items-center justify-center gap-10 flex-wrap opacity-40">
-          {/* Placeholder logos rendered as text in various styles */}
-          <span className="text-xs font-bold tracking-widest uppercase">Accenture</span>
-          <span className="text-xs font-bold tracking-widest uppercase">Deloitte</span>
-          <span className="text-xs font-bold tracking-widest uppercase">Cognizant</span>
-          <span className="text-xs font-bold tracking-widest uppercase">IBM</span>
-          <span className="text-xs font-bold tracking-widest uppercase">Infosys</span>
+      <div className="max-w-7xl mx-auto px-6 py-4 text-center">
+        <div className="flex items-center justify-center gap-8 md:gap-14 flex-wrap">
+          <img src="/logos/logo1.png" alt="Partner Logo 1" className="h-20 md:h-24 w-auto max-w-[200px] object-contain hover:scale-105 transition-transform duration-300" />
+          <img src="/logos/logo2.png" alt="Partner Logo 2" className="h-16 md:h-20 w-auto max-w-[160px] object-contain hover:scale-105 transition-transform duration-300" />
+          <img src="/logos/logo3.png" alt="Partner Logo 3" className="h-16 md:h-20 w-auto max-w-[200px] object-contain hover:scale-105 transition-transform duration-300" />
+          <img src="/logos/logo4.png" alt="Partner Logo 4" className="h-20 md:h-24 w-auto max-w-[200px] object-contain hover:scale-105 transition-transform duration-300" />
         </div>
       </div>
 
