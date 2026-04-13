@@ -86,9 +86,15 @@ const profileUpdateSchema = z.object({
  * Zod-based validate. Returns { valid: true, data } or { valid: false, errors: string[] }.
  */
 function validate(schema, data) {
+  // Guard against undefined/null body (missing Content-Type, body parser skipped, etc.)
+  if (data === undefined || data === null) {
+    return { valid: false, errors: ['Request body is missing or empty'] };
+  }
   const result = schema.safeParse(data);
   if (result.success) return { valid: true, data: result.data };
-  const errors = result.error.errors.map((e) => e.message);
+  const errors = result.error?.errors?.map((e) => e.message)
+    ?? result.error?.issues?.map((e) => e.message)
+    ?? [result.error?.message ?? 'Validation failed'];
   return { valid: false, errors };
 }
 
