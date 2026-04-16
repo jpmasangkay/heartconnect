@@ -66,7 +66,7 @@ const registerSchema = z.object({
   password: z.string().min(12, 'Password must be at least 12 characters'),
   role: z.enum(['student', 'client'], { message: 'Role must be student or client' }),
   university: z.string().trim().max(200).optional(),
-  agreedToTerms: z.coerce.boolean().refine((val) => val === true, { message: 'You must agree to the Terms of Service and Privacy Policy' }),
+  agreedToTerms: z.literal(true, { error: 'You must agree to the Terms of Service and Privacy Policy' }),
 });
 
 // ─── Profile Update ──────────────────────────────────────────────────────────
