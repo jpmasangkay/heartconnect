@@ -93,7 +93,8 @@ const corsOrigin = isProd
 app.use(cors({
   origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // Include app-specific headers used by the mobile client.
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Platform'],
   credentials: true,
 }));
 
@@ -110,6 +111,11 @@ if (isProd) {
     }
     // Allow requests with a valid Bearer token but no origin (API clients)
     if (req.headers.authorization?.startsWith('Bearer ')) return next();
+    // Allow native mobile clients (they are not browsers; CORS/CSRF isn't applicable)
+    // The Flutter app sends `X-Platform: mobile`.
+    if ((req.headers['x-platform'] || '').toString().toLowerCase() === 'mobile') {
+      return next();
+    }
     return res.status(403).json({ message: 'Forbidden: origin not allowed' });
   });
 }
