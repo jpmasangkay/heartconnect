@@ -26,9 +26,16 @@ export default function Navbar() {
         {/* Logo */}
         <Link
           to="/"
-          className="text-sm font-bold tracking-widest uppercase text-white hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          HEARTCONNECT
+          <img
+            src="/logos/heartconnect-logo.png"
+            alt="HeartConnect Logo"
+            className="h-8 w-8 object-contain"
+          />
+          <span className="text-sm font-bold tracking-widest uppercase text-white">
+            HEARTCONNECT
+          </span>
         </Link>
 
         {/* Desktop nav */}
