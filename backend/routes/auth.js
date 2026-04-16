@@ -33,7 +33,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ errors: parsed.errors });
     }
 
-    const { name, email, password, role, university, agreedToTerms } = parsed.data;
+    const { name, email, password, role, university } = parsed.data;
 
     if (!password || typeof password !== 'string') {
       return res.status(400).json({ message: 'Password is required' });
@@ -50,7 +50,7 @@ router.post('/register', async (req, res) => {
     const safeData = { name, email, password, role };
     if (university) safeData.university = university;
 
-    const user  = await User.create({ ...safeData, agreedToTerms, agreedToTermsAt: new Date() });
+    const user  = await User.create({ ...safeData, agreedToTerms: true, agreedToTermsAt: new Date() });
     const token = signToken(user._id, user.tokenVersion);
     setTokenCookie(res, token);
     res.status(201).json({ token, user: sanitizeUser(user) });
