@@ -124,7 +124,7 @@ if (isProd) {
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: 'Too many requests from this IP, please try again later.',
+  message: { message: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => process.env.NODE_ENV !== 'production',
@@ -133,8 +133,16 @@ const generalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: 'Too many login attempts, please try again later.',
+  message: { message: 'Too many login attempts, please try again later.' },
   skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many reset attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -142,7 +150,7 @@ const authLimiter = rateLimit({
 const sensitiveWriteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
-  message: 'Too many requests, please try again later.',
+  message: { message: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -155,8 +163,8 @@ app.use(logSecurityEvent);
 // ─── REST Routes ──────────────────────────────────────────────────────────────
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
-app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth/forgot-password', resetLimiter);
+app.use('/api/auth/reset-password', resetLimiter);
 app.use('/api/auth/2fa/verify', authLimiter);
 app.use('/api/auth/2fa',       require('./routes/twoFactor'));
 app.use('/api/auth', require('./routes/auth'));
@@ -189,10 +197,11 @@ app.use((err, req, res, next) => {
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 
+  const status = err.status || 500;
   const isDevelopment = process.env.NODE_ENV === 'development';
-  res.status(err.status || 500).json({
-    message: isDevelopment ? err.message : 'Internal Server Error',
-  });
+  // Show real message for client errors (4xx); mask server errors (5xx) in production
+  const message = (isDevelopment || status < 500) ? err.message : 'Internal Server Error';
+  res.status(status).json({ message });
 });
 
 // ─── Socket.io (extracted to socket.js) ───────────────────────────────────────
