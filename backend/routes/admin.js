@@ -61,6 +61,7 @@ router.post('/ban/:userId', protect, adminAuth, async (req, res) => {
     user.isBanned  = true;
     user.banReason = reason;
     user.bannedAt  = new Date();
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save();
 
     res.json({ message: 'User banned', user: { _id: user._id, name: user.name, isBanned: true, banReason: user.banReason } });

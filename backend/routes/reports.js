@@ -89,6 +89,7 @@ router.patch('/:id', protect, adminAuth, async (req, res) => {
           isBanned: true,
           banReason: `Auto-banned: ${validCount} valid reports`,
           bannedAt: new Date(),
+          $inc: { tokenVersion: 1 },
         });
         autoBanned = true;
       }

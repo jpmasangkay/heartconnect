@@ -126,6 +126,17 @@ router.post('/login', async (req, res) => {
       { failedAttempts: 0, $unset: { lockedUntil: 1 } }
     ).catch(() => {});
 
+    // Block banned users from logging in
+    if (user.isBanned) {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      return res.status(403).json({
+        message: `Your account has been banned. Reason: ${user.banReason || 'Violation of terms of service'}. Please contact the admin at ${adminEmail} for assistance.`,
+        isBanned: true,
+        banReason: user.banReason || null,
+        adminEmail,
+      });
+    }
+
     // If 2FA is enabled, return temp token and require 2FA verification
     if (user.twoFactorEnabled) {
       const tempToken = signTempToken(user._id);
