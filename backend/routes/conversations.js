@@ -1,5 +1,7 @@
 const router   = require('express').Router();
 const mongoose = require('mongoose');
+const fs       = require('fs');
+const path     = require('path');
 const { Conversation, Message } = require('../models/Conversation');
 const Application = require('../models/Application');
 const Job = require('../models/Job');
@@ -303,6 +305,23 @@ router.delete('/:id', protect, async (req, res) => {
     const hiddenSet = new Set(convo.hiddenFor.map(String));
     const allHidden = participantIds.every((pid) => hiddenSet.has(pid));
     if (allHidden) {
+      // Clean up uploaded files before deleting messages
+      const fileMessages = await Message.find(
+        { conversation: convo._id, fileUrl: { $exists: true, $ne: null } },
+        'fileUrl',
+      ).lean();
+      for (const fm of fileMessages) {
+        try {
+          // fileUrl is stored as e.g. "/uploads/chat/filename.ext"
+          const filePath = path.join(__dirname, '..', '..', fm.fileUrl);
+          await fs.promises.unlink(filePath);
+        } catch (err) {
+          // File may already be missing; log and continue
+          if (err.code !== 'ENOENT') {
+            logger.warn('Failed to delete chat file', { fileUrl: fm.fileUrl, error: err.message });
+          }
+        }
+      }
       await Message.deleteMany({ conversation: convo._id });
       await convo.deleteOne();
       for (const pid of participantIds) {
