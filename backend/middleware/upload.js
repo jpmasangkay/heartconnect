@@ -1,6 +1,7 @@
-const multer = require('multer');
-const path   = require('path');
-const fs     = require('fs');
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
+const FileType = require('file-type');
 
 // Ensure upload directories exist
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
@@ -18,57 +19,73 @@ const ALLOWED_FILE_TYPES  = [
   'application/zip',
 ];
 
-const MIME_TO_EXT = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/gif': '.gif',
-  'image/webp': '.webp',
-  'application/pdf': '.pdf',
-  'application/msword': '.doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-  'application/zip': '.zip',
+const memoryStorage = multer.memoryStorage();
+const baseChatMulter = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const baseVerificationMulter = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+/**
+ * Validates memory buffer via file-type magic bytes and commits to disk
+ */
+function createMagicByteUpload(baseMulter, fieldName, targetDir, allowedTypes) {
+  const single = baseMulter.single(fieldName);
+
+  return (req, res, next) => {
+    single(req, res, async (err) => {
+      if (err) return next(err);
+      if (!req.file) return next();
+
+      try {
+        const detected = await FileType.fromBuffer(req.file.buffer);
+
+        // If file-type detects a mime, verify it
+        if (detected) {
+          if (!allowedTypes.includes(detected.mime)) {
+            return res.status(400).json({
+              message: `File content rejected: magic bytes (${detected.mime}) do not match allowed types.`,
+            });
+          }
+          req.file.mimetype = detected.mime;
+        } else {
+          // Fallback check for plain text or formats without signature
+          if (!allowedTypes.includes(req.file.mimetype)) {
+            return res.status(400).json({ message: 'File type not allowed' });
+          }
+        }
+
+        const ext = detected ? `.${detected.ext}` : (path.extname(req.file.originalname) || '.bin');
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+        const targetPath = path.join(UPLOAD_ROOT, targetDir, filename);
+
+        await fs.promises.writeFile(targetPath, req.file.buffer);
+
+        req.file.filename = filename;
+        req.file.path = targetPath;
+        next();
+      } catch (validationErr) {
+        return res.status(500).json({ message: 'Error processing file upload', error: validationErr.message });
+      }
+    });
+  };
+}
+
+const chatUpload = {
+  single: (field) => createMagicByteUpload(baseChatMulter, field, 'chat', ALLOWED_FILE_TYPES),
 };
 
-// Chat attachments (images + documents, max 5 MB)
-const chatStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(UPLOAD_ROOT, 'chat')),
-  filename: (req, file, cb) => {
-    const ext = MIME_TO_EXT[file.mimetype] || path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
+const verificationUpload = {
+  single: (field) => createMagicByteUpload(baseVerificationMulter, field, 'verification', ALLOWED_IMAGE_TYPES),
+};
 
-const chatUpload = multer({
-  storage: chatStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (ALLOWED_FILE_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('File type not allowed'), false);
-    }
-  },
-});
-
-// Verification ID uploads (images only, max 5 MB)
-const verificationStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(UPLOAD_ROOT, 'verification')),
-  filename: (req, file, cb) => {
-    const ext = MIME_TO_EXT[file.mimetype] || path.extname(file.originalname);
-    cb(null, `${req.user._id}-${Date.now()}${ext}`);
-  },
-});
-
-const verificationUpload = multer({
-  storage: verificationStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'), false);
-    }
-  },
-});
-
-module.exports = { chatUpload, verificationUpload, ALLOWED_IMAGE_TYPES };
+module.exports = {
+  chatUpload,
+  verificationUpload,
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_FILE_TYPES,
+};

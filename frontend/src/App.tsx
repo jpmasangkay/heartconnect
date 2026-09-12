@@ -11,6 +11,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PageTransition from './components/PageTransition';
 import OnboardingTour from './components/OnboardingTour';
 import Navbar from './components/Navbar';
+import { Toaster } from './components/ui/sonner';
+import { CommandPalette } from './components/CommandPalette';
+import { ConfirmModal } from './components/ConfirmModal';
 
 // Eagerly loaded (small / critical path)
 import Landing from './pages/Landing';
@@ -207,6 +210,9 @@ function App() {
                 <NotificationProvider>
                   <OnboardingGate>
                     <AnimatedRoutes />
+                    <CommandPalette />
+                    <ConfirmModal />
+                    <Toaster position="bottom-right" richColors />
                   </OnboardingGate>
                 </NotificationProvider>
               </UnreadProvider>

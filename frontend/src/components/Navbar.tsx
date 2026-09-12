@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, MessageSquare, Bell, Bookmark, Shield } from 'lucide-react';
+import { Menu, X, MessageSquare, Bell, Bookmark, Shield, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUnread } from '../context/UnreadContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useUiStore } from '../stores/useUiStore';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const { unreadCount } = useUnread();
   const { unreadCount: notifCount } = useNotifications();
+  const { openCommandPalette } = useUiStore();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -24,19 +26,35 @@ export default function Navbar() {
     <nav className="bg-navy text-white w-full z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link
-          to="/"
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-        >
-          <img
-            src="/logos/heartconnect-logo.png"
-            alt="HeartConnect Logo"
-            className="h-8 w-8 object-contain"
-          />
-          <span className="text-sm font-bold tracking-widest uppercase text-white">
-            HEARTCONNECT
-          </span>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logos/heartconnect-logo.png"
+              alt="HeartConnect Logo"
+              className="h-8 w-8 object-contain"
+            />
+            <span className="text-sm font-bold tracking-widest uppercase text-white">
+              HEARTCONNECT
+            </span>
+          </Link>
+
+          {/* Quick Search / Command Palette Shortcut */}
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            className="hidden sm:flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/70 hover:text-white px-3 py-1.5 rounded-lg text-xs transition-colors border border-white/10"
+            title="Search & Quick Navigation (Ctrl+K / ⌘K)"
+          >
+            <Search size={13} />
+            <span className="hidden md:inline">Search...</span>
+            <kbd className="inline-flex items-center text-[10px] bg-white/15 px-1.5 py-0.5 rounded text-white/90 font-mono">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-6">

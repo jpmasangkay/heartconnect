@@ -18,11 +18,24 @@ const compression  = require('compression');
 const rateLimit    = require('express-rate-limit');
 const mongoose     = require('mongoose');
 const cookieParser = require('cookie-parser');
+const hpp          = require('hpp');
+const Sentry       = require('@sentry/node');
 const requestId  = require('./middleware/requestId');
 const monitor    = require('./middleware/monitor');
 const logger     = require('./services/logger');
+const { sanitizeRequest } = require('./middleware/sanitize');
+const { generateCsrfToken } = require('./middleware/csrf');
 const { logSecurityEvent } = require('./middleware/audit');
 const { setupSocket } = require('./socket');
+
+// Initialize Sentry observability if configured
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 1.0,
+  });
+}
 
 const app    = express();
 const server = http.createServer(app);
@@ -56,6 +69,10 @@ app.use(helmet({
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ limit: '10kb', extended: false }));
 app.use(cookieParser());
+
+// ─── HTTP Parameter Pollution & NoSQL Sanitization ────────────────────────────
+app.use(hpp());
+app.use(sanitizeRequest);
 
 // ─── CORS origin setup (used by /uploads, CORS middleware, and Socket.io) ────
 const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173')
@@ -178,10 +195,18 @@ app.use('/api/verification',   require('./routes/verification'));
 app.use('/api/reports',        sensitiveWriteLimiter, require('./routes/reports'));
 app.use('/api/blocks',         require('./routes/blocks'));
 app.use('/api/admin',          require('./routes/admin'));
+app.get('/api/csrf-token', (req, res) => {
+  const token = generateCsrfToken(req, res);
+  res.json({ csrfToken: token });
+});
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
+
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({ message: 'File too large. Maximum size is 5 MB.' });
   }

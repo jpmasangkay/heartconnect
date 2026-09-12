@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
     const {
       search, skill, budgetMin, budgetMax, status,
       skills, deadlineBefore, deadlineAfter, locationType,
-      page = 1, limit = 10,
+      page = 1, limit = 10, sort = 'newest',
     } = req.query;
     const query = {};
 
@@ -91,11 +91,17 @@ router.get('/', async (req, res) => {
       query.locationType = locationType;
     }
 
+    let sortOption = { createdAt: -1 };
+    if (sort === 'budget_desc') sortOption = { budget: -1 };
+    else if (sort === 'budget_asc') sortOption = { budget: 1 };
+    else if (sort === 'deadline') sortOption = { deadline: 1 };
+    else if (sort === 'oldest') sortOption = { createdAt: 1 };
+
     const total = await Job.countDocuments(query);
     const jobs  = await Job.find(query)
       .populate('client', 'name avatar')
       .populate('applicationsCount')
-      .sort({ createdAt: -1 })
+      .sort(sortOption)
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
       .lean();

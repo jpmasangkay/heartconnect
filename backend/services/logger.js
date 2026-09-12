@@ -1,39 +1,29 @@
-/**
- * Structured JSON logger.
- * In production this would pipe to ELK / CloudWatch / Datadog.
- * Locally it outputs coloured text for readability.
- */
+const pino = require('pino');
+
 const isDev = process.env.NODE_ENV !== 'production';
 
-function formatLog(level, message, meta = {}) {
-  const entry = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-    ...meta,
-  };
-
-  if (isDev) {
-    const prefix = { info: 'ℹ️', warn: '⚠️', error: '❌' }[level] || '•';
-    const metaStr = Object.keys(meta).length
-      ? ' ' + JSON.stringify(meta)
-      : '';
-    return `${prefix} [${entry.timestamp}] ${message}${metaStr}`;
-  }
-
-  return JSON.stringify(entry);
-}
+const pinoLogger = pino({
+  level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
+  base: {
+    service: 'heartconnect-api',
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+});
 
 const logger = {
-  info(message, meta) {
-    console.log(formatLog('info', message, meta));
+  info(message, meta = {}) {
+    pinoLogger.info(meta, message);
   },
-  warn(message, meta) {
-    console.warn(formatLog('warn', message, meta));
+  warn(message, meta = {}) {
+    pinoLogger.warn(meta, message);
   },
-  error(message, meta) {
-    console.error(formatLog('error', message, meta));
+  error(message, meta = {}) {
+    pinoLogger.error(meta, message);
   },
+  debug(message, meta = {}) {
+    pinoLogger.debug(meta, message);
+  },
+  raw: pinoLogger,
 };
 
 module.exports = logger;

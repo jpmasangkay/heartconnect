@@ -73,8 +73,8 @@ export function useStickyProgress(sectionRef: RefObject<HTMLElement | null>): nu
 export function useInView<T extends HTMLElement>(
   options: IntersectionObserverInit = {},
   once = true,
-): [RefObject<T | null>, boolean] {
-  const ref = useRef<T | null>(null);
+): [RefObject<T>, boolean] {
+  const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);
 
   useEffect(() => {

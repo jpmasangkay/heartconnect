@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Shield, Palette, Megaphone, Code, BarChart2, Smartphone } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useScrollY, useParallax, useStickyProgress, useInView } from '../hooks/useParallax';
+import { HeroScene } from '../components/3d/HeroScene';
+import { IsolatedErrorBoundary } from '../components/IsolatedErrorBoundary';
 
 const CATEGORIES = [
   {
@@ -117,10 +119,10 @@ function StickyHero() {
 
         {/* App-like translucent circle backdrop */}
         <div aria-hidden className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-24 -left-28 w-[520px] h-[520px] rounded-full bg-sand-light opacity-55" />
-          <div className="absolute -top-36 -right-24 w-[460px] h-[460px] rounded-full bg-cream-dark opacity-70" />
-          <div className="absolute top-32 -right-20 w-[360px] h-[360px] rounded-full bg-sand opacity-30" />
-          <div className="absolute -bottom-40 left-12 w-[520px] h-[520px] rounded-full bg-sand-light opacity-45" />
+          <div className="absolute -top-24 -left-28 w-130 h-130 rounded-full bg-sand-light opacity-55" />
+          <div className="absolute -top-36 -right-24 w-115 h-115 rounded-full bg-cream-dark opacity-70" />
+          <div className="absolute top-32 -right-20 w-90 h-90 rounded-full bg-sand opacity-30" />
+          <div className="absolute -bottom-40 left-12 w-130 h-130 rounded-full bg-sand-light opacity-45" />
         </div>
 
         <ParallaxOrb size={480} top="-60px"  left="-100px" color="radial-gradient(circle, #1C3A28 0%, transparent 70%)" speed={0.15} opacity={0.12} blur={100} />
@@ -167,10 +169,10 @@ function StickyHero() {
           style={{ opacity: Math.max(0, 1 - progress * 8), transition: 'opacity 0.3s' }}
         >
           <span className="text-[10px] uppercase tracking-widest text-stone-muted">Scroll</span>
-          <div className="w-px h-8 bg-gradient-to-b from-stone-300 to-transparent animate-pulse" />
+          <div className="w-px h-8 bg-linear-to-b from-stone-300 to-transparent animate-pulse" />
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-cream to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-linear-to-t from-cream to-transparent pointer-events-none" />
       </div>
     </div>
   );
@@ -180,6 +182,41 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-cream flex flex-col overflow-x-hidden">
       <StickyHero />
+
+      {/* Interactive 3D Physics Talent Hub */}
+      <section className="relative max-w-5xl mx-auto w-full px-6 py-10 -mt-10 z-20">
+        <div className="rounded-3xl border border-stone-border bg-white/80 backdrop-blur-md overflow-hidden shadow-sm p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="max-w-md">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-muted bg-sand-light/70 border border-stone-border/70 px-3 py-1 rounded-full">
+                Interactive Physics & Talent Network
+              </span>
+              <h2 className="text-2xl md:text-3xl font-black text-foreground mt-3.5 tracking-tight">
+                Cordian Skills Connected in Motion
+              </h2>
+              <p className="text-sm text-stone-muted mt-2.5 leading-relaxed">
+                Interact with our real-time 3D physics network. Drag, tilt, and explore dynamic nodes connecting student freelancers with verified clients.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-stone-muted">
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-navy" /> Web & Code
+                </span>
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sand" /> Graphic Design
+                </span>
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-accent" /> Growth Marketing
+                </span>
+              </div>
+            </div>
+            <div className="w-full lg:w-120 h-80 rounded-2xl bg-cream-dark/30 border border-stone-border/60 overflow-hidden relative shadow-inner">
+              <IsolatedErrorBoundary fallbackTitle="3D Scene Unavailable" fallbackMessage="Your browser or device does not currently support WebGL rendering.">
+                <HeroScene />
+              </IsolatedErrorBoundary>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Category cards */}
       <section className="relative max-w-5xl mx-auto w-full px-6 pb-20 bg-cream">

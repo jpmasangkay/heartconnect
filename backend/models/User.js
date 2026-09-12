@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const argon2 = require('argon2');
 
 const userSchema = new mongoose.Schema({
   name:      { type: String, required: true, trim: true, maxlength: 100 },
@@ -59,12 +60,15 @@ userSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await argon2.hash(this.password);
   next();
 });
 
-userSchema.methods.matchPassword = function (plain) {
-  return bcrypt.compare(plain, this.password);
+userSchema.methods.matchPassword = async function (plain) {
+  if (this.password && this.password.startsWith('$argon2')) {
+    return await argon2.verify(this.password, plain);
+  }
+  return await bcrypt.compare(plain, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);

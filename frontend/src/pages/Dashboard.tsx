@@ -11,6 +11,8 @@ import { jobsApi, applicationsApi } from '../api';
 import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { toast } from '../components/ui/sonner';
+import { useUiStore } from '../stores/useUiStore';
 import type { Job, Application, User } from '../types';
 
 function getGreeting(): string {
@@ -260,18 +262,51 @@ function ClientDashboard({ user }: { user: User }) {
     completed: jobs.filter((j) => j.status === 'completed'),
   }), [jobs]);
 
-  const handleClose = async (jobId: string) => {
-    try {
-      await jobsApi.close(jobId);
-      setJobs((prev) => prev.map((j) => j._id === jobId ? { ...j, status: 'closed' } : j));
-    } catch { /* noop */ }
+  const { openConfirmDialog } = useUiStore();
+
+  const handleClose = (jobId: string) => {
+    openConfirmDialog({
+      title: 'Close this job listing?',
+      description: 'Closed listings will no longer appear on the public job board or accept new applicant proposals.',
+      confirmLabel: 'Close Listing',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await jobsApi.close(jobId);
+          setJobs((prev) => prev.map((j) => (j._id === jobId ? { ...j, status: 'closed' } : j)));
+          toast.success('Job listing closed', {
+            action: {
+              label: 'Undo',
+              onClick: () => {
+                void jobsApi.update(jobId, { status: 'open' }).then(() => {
+                  setJobs((prev) => prev.map((j) => (j._id === jobId ? { ...j, status: 'open' } : j)));
+                });
+              },
+            },
+          });
+        } catch {
+          toast.error('Failed to close job listing');
+        }
+      },
+    });
   };
 
-  const handleComplete = async (jobId: string) => {
-    try {
-      await jobsApi.complete(jobId);
-      setJobs((prev) => prev.map((j) => j._id === jobId ? { ...j, status: 'completed' } : j));
-    } catch { /* noop */ }
+  const handleComplete = (jobId: string) => {
+    openConfirmDialog({
+      title: 'Mark job as completed?',
+      description: 'This will archive the project and unlock performance reviews for both client and student.',
+      confirmLabel: 'Mark Completed',
+      variant: 'default',
+      onConfirm: async () => {
+        try {
+          await jobsApi.complete(jobId);
+          setJobs((prev) => prev.map((j) => (j._id === jobId ? { ...j, status: 'completed' } : j)));
+          toast.success('Job successfully marked as completed');
+        } catch {
+          toast.error('Failed to mark job completed');
+        }
+      },
+    });
   };
 
   const totalApps = jobs.reduce((sum, j) => sum + (j.applicationsCount ?? 0), 0);
@@ -483,7 +518,7 @@ function JobRow({
           <div className="flex items-center gap-2 mt-1 text-xs text-stone-muted">
             <span>₱{job.budget.toLocaleString()} {job.budgetType}</span>
             <span className="text-stone-border">·</span>
-            <span className={apps > 0 ? 'text-[#1C3A28] font-medium' : ''}>
+            <span className={apps > 0 ? 'text-navy font-medium' : ''}>
               {apps} {apps === 1 ? 'applicant' : 'applicants'}
             </span>
           </div>

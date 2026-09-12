@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect, type FormEvent, Suspense } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Briefcase } from 'lucide-react';
 import Footer from '../components/Footer';
 import JobCard from '../components/JobCard';
 import { Input, Select } from '../components/ui/forms';
@@ -8,80 +8,59 @@ import { jobsApi } from '../api';
 import { useSocket } from '../context/SocketContext';
 import { FadePresence } from '../components/ui/loading-fade';
 import { JobCardSkeleton } from '../components/ui/skeleton';
-import { waitMinSkeletonMs } from '../lib/minSkeletonDelay';
+import { EmptyState } from '../components/ui/empty-state';
+import { IsolatedErrorBoundary } from '../components/IsolatedErrorBoundary';
+import { useJobFiltersFromUrl, useJobsQuery, type ExtendedJobFilters } from '../hooks/useJobsQuery';
 import type { Job } from '../types';
+
+function JobGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <JobCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
 
 export default function JobBoard() {
   const { socket } = useSocket();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 320);
-  const [skill, setSkill] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const queryClient = useQueryClient();
+  const { filters, updateFilters, resetFilters } = useJobFiltersFromUrl();
+
+  const [localSearch, setLocalSearch] = useState(filters.search || '');
+  const [prevSearch, setPrevSearch] = useState(filters.search);
   const [showFilters, setShowFilters] = useState(false);
-  const [budgetMin, setBudgetMin] = useState('');
-  const [budgetMax, setBudgetMax] = useState('');
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
 
+  // Adjust state during render if URL changes (avoids cascading effect renders)
+  if (filters.search !== prevSearch) {
+    setPrevSearch(filters.search);
+    setLocalSearch(filters.search || '');
+  }
+
+  // Load unique skill categories
   useEffect(() => {
-    jobsApi.getSkills().then((res) => {
-      setAvailableSkills(res.data.categories ?? []);
-    }).catch(() => setAvailableSkills([]));
+    jobsApi
+      .getSkills()
+      .then((res: { data: { categories?: string[] } }) => {
+        setAvailableSkills(res.data.categories ?? []);
+      })
+      .catch(() => setAvailableSkills([]));
   }, []);
 
-  const fetchJobs = useCallback(
-    async (signal?: AbortSignal, opts?: { silent?: boolean }) => {
-      const silent = opts?.silent === true;
-      if (!silent) setLoading(true);
-      const t0 = Date.now();
-      try {
-        const res = await jobsApi.getAll(
-          {
-            search: debouncedSearch || undefined,
-            skill: skill || undefined,
-            budgetMin: budgetMin ? Number(budgetMin) : undefined,
-            budgetMax: budgetMax ? Number(budgetMax) : undefined,
-            page,
-            limit: 9,
-          },
-          { signal },
-        );
-        if (signal?.aborted) return;
-        if (silent) {
-          setJobs(res.data.data);
-          setTotalPages(res.data.pages || 1);
-          return;
-        }
-        await waitMinSkeletonMs(t0, signal);
-        if (signal?.aborted) return;
-        setJobs(res.data.data);
-        setTotalPages(res.data.pages || 1);
-      } catch {
-        if (signal?.aborted) return;
-        if (silent) return;
-        await waitMinSkeletonMs(t0, signal);
-        if (signal?.aborted) return;
-        setJobs([]);
-        setTotalPages(1);
-      } finally {
-        if (!silent && !signal?.aborted) setLoading(false);
-      }
-    },
-    [debouncedSearch, skill, budgetMin, budgetMax, page],
-  );
+  // TanStack Query for server-synchronized data
+  const { data, isLoading, refetch } = useJobsQuery(filters);
 
-  useEffect(() => {
-    const ac = new AbortController();
-    void fetchJobs(ac.signal);
-    return () => ac.abort();
-  }, [fetchJobs]);
+  const jobs = data?.data ?? [];
+  const totalPages = data?.pages ?? 1;
+  const totalCount = data?.total ?? 0;
 
+  // Real-time socket updates invalidate TanStack Query cache
   useEffect(() => {
     if (!socket) return;
     const refresh = () => {
-      void fetchJobs(undefined, { silent: true });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
     };
     socket.on('job:created', refresh);
     socket.on('job:updated', refresh);
@@ -91,22 +70,20 @@ export default function JobBoard() {
       socket.off('job:updated', refresh);
       socket.off('job:deleted', refresh);
     };
-  }, [socket, fetchJobs]);
+  }, [socket, queryClient]);
 
-  const handleSearch = (e: FormEvent) => {
+  const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setPage(1);
+    updateFilters({ search: localSearch.trim() || undefined, page: 1 });
   };
 
-  const clearFilters = () => {
-    setSearch('');
-    setSkill('');
-    setBudgetMin('');
-    setBudgetMax('');
-    setPage(1);
-  };
-
-  const hasActiveFilters = !!(search || skill || budgetMin || budgetMax);
+  const hasActiveFilters = Boolean(
+    filters.search ||
+    filters.skill ||
+    filters.budgetMin !== undefined ||
+    filters.budgetMax !== undefined ||
+    (filters.sort && filters.sort !== 'newest')
+  );
 
   return (
     <div className="min-h-screen bg-cream flex flex-col">
@@ -115,40 +92,63 @@ export default function JobBoard() {
         <div className="pt-10 pb-6">
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Find work</h1>
           <p className="text-sm text-stone-muted mt-1">
-            Jobs posted by clients looking for students like you
+            Jobs posted by clients looking for Cordian students like you
           </p>
         </div>
 
-        {/* Search & filters */}
+        {/* Search & filters with URL State Synchronization */}
         <div className="mb-8">
-          <form onSubmit={handleSearch} className="flex gap-2">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
             <div className="flex-1 relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-muted pointer-events-none" />
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-muted pointer-events-none"
+              />
               <Input
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search by title, skill, or keyword..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                placeholder="Search by title, skill, or keyword... (Press Enter)"
                 className="pl-9"
               />
             </div>
 
             <Select
-              value={skill}
-              onChange={(e) => { setSkill(e.target.value); setPage(1); }}
+              value={filters.skill || ''}
+              onChange={(e) => updateFilters({ skill: e.target.value || undefined, page: 1 })}
               className="w-44 hidden sm:block"
             >
               <option value="">All skills</option>
               {availableSkills.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
+            </Select>
+
+            {/* Sort Dropdown */}
+            <Select
+              value={filters.sort || 'newest'}
+              onChange={(e) =>
+                updateFilters({
+                  sort: e.target.value as ExtendedJobFilters['sort'],
+                  page: 1,
+                })
+              }
+              className="w-40 hidden md:block"
+            >
+              <option value="newest">Newest first</option>
+              <option value="budget_desc">Highest budget</option>
+              <option value="budget_asc">Lowest budget</option>
+              <option value="deadline">Upcoming deadline</option>
+              <option value="oldest">Oldest first</option>
             </Select>
 
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className={`border text-sm px-3 py-2 rounded-lg ${
+              className={`border text-sm px-3 py-2 rounded-lg transition-colors ${
                 showFilters
-                  ? 'border-navy bg-cream-dark text-navy'
+                  ? 'border-navy bg-cream-dark text-navy font-medium'
                   : 'border-stone-border bg-white text-stone-muted hover:text-foreground'
               }`}
               aria-label="Toggle filters"
@@ -157,14 +157,20 @@ export default function JobBoard() {
             </button>
           </form>
 
+          {/* Collapsible Filter Panel */}
           {showFilters && (
-            <div className="mt-3 p-4 bg-white border border-stone-border rounded-lg flex flex-wrap gap-4 items-end">
+            <div className="mt-3 p-4 bg-white border border-stone-border rounded-xl flex flex-wrap gap-4 items-end shadow-xs">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-stone-muted">Min budget (₱)</label>
                 <Input
                   type="number"
-                  value={budgetMin}
-                  onChange={(e) => { setBudgetMin(e.target.value); setPage(1); }}
+                  value={filters.budgetMin ?? ''}
+                  onChange={(e) =>
+                    updateFilters({
+                      budgetMin: e.target.value ? Number(e.target.value) : undefined,
+                      page: 1,
+                    })
+                  }
                   placeholder="0"
                   className="w-28"
                 />
@@ -173,25 +179,36 @@ export default function JobBoard() {
                 <label className="text-xs font-medium text-stone-muted">Max budget (₱)</label>
                 <Input
                   type="number"
-                  value={budgetMax}
-                  onChange={(e) => { setBudgetMax(e.target.value); setPage(1); }}
+                  value={filters.budgetMax ?? ''}
+                  onChange={(e) =>
+                    updateFilters({
+                      budgetMax: e.target.value ? Number(e.target.value) : undefined,
+                      page: 1,
+                    })
+                  }
                   placeholder="Any"
                   className="w-28"
                 />
               </div>
               <div className="sm:hidden flex flex-col gap-1 flex-1">
                 <label className="text-xs font-medium text-stone-muted">Skill</label>
-                <Select value={skill} onChange={(e) => { setSkill(e.target.value); setPage(1); }}>
+                <Select
+                  value={filters.skill || ''}
+                  onChange={(e) => updateFilters({ skill: e.target.value || undefined, page: 1 })}
+                >
                   <option value="">All skills</option>
                   {availableSkills.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
                   ))}
                 </Select>
               </div>
               {hasActiveFilters && (
                 <button
-                  onClick={clearFilters}
-                  className="text-xs text-stone-muted hover:text-foreground flex items-center gap-1"
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-xs text-stone-muted hover:text-foreground flex items-center gap-1 pb-2 font-medium"
                 >
                   <X size={12} /> Clear all
                 </button>
@@ -199,99 +216,145 @@ export default function JobBoard() {
             </div>
           )}
 
-          {/* Active filter pills */}
+          {/* Active Filter Pills (URL State Synchronized) */}
           {hasActiveFilters && !showFilters && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {skill && (
-                <span className="inline-flex items-center gap-1 text-xs bg-cream-dark text-foreground px-2.5 py-1 rounded-full">
-                  {skill}
-                  <button onClick={() => { setSkill(''); setPage(1); }} className="text-stone-muted hover:text-foreground">
+              {filters.search && (
+                <span className="inline-flex items-center gap-1 text-xs bg-sand-light/70 text-navy font-medium px-2.5 py-1 rounded-full border border-stone-border/60">
+                  Search: "{filters.search}"
+                  <button
+                    onClick={() => updateFilters({ search: undefined, page: 1 })}
+                    className="text-stone-muted hover:text-foreground"
+                  >
                     <X size={11} />
                   </button>
                 </span>
               )}
-              {(budgetMin || budgetMax) && (
-                <span className="inline-flex items-center gap-1 text-xs bg-cream-dark text-foreground px-2.5 py-1 rounded-full">
-                  {budgetMin ? `₱${Number(budgetMin).toLocaleString()}` : '₱0'}
+              {filters.skill && (
+                <span className="inline-flex items-center gap-1 text-xs bg-sand-light/70 text-navy font-medium px-2.5 py-1 rounded-full border border-stone-border/60">
+                  {filters.skill}
+                  <button
+                    onClick={() => updateFilters({ skill: undefined, page: 1 })}
+                    className="text-stone-muted hover:text-foreground"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+              {(filters.budgetMin !== undefined || filters.budgetMax !== undefined) && (
+                <span className="inline-flex items-center gap-1 text-xs bg-sand-light/70 text-navy font-medium px-2.5 py-1 rounded-full border border-stone-border/60">
+                  {filters.budgetMin ? `₱${filters.budgetMin.toLocaleString()}` : '₱0'}
                   {' – '}
-                  {budgetMax ? `₱${Number(budgetMax).toLocaleString()}` : 'Any'}
-                  <button onClick={() => { setBudgetMin(''); setBudgetMax(''); setPage(1); }} className="text-stone-muted hover:text-foreground">
+                  {filters.budgetMax ? `₱${filters.budgetMax.toLocaleString()}` : 'Any'}
+                  <button
+                    onClick={() =>
+                      updateFilters({ budgetMin: undefined, budgetMax: undefined, page: 1 })
+                    }
+                    className="text-stone-muted hover:text-foreground"
+                  >
                     <X size={11} />
                   </button>
                 </span>
               )}
-              <button onClick={clearFilters} className="text-xs text-stone-muted hover:text-foreground">
-                Clear all
+              <button
+                onClick={resetFilters}
+                className="text-xs text-stone-muted hover:text-foreground font-medium underline underline-offset-2"
+              >
+                Clear all filters
               </button>
             </div>
           )}
         </div>
 
-        {/* Results */}
-        <FadePresence
-          activeKey={loading ? 'loading' : jobs.length === 0 ? 'empty' : 'list'}
+        {/* Isolated Error Boundary containing route crashes */}
+        <IsolatedErrorBoundary
+          fallbackTitle="Failed to Load Jobs"
+          fallbackMessage="Unable to retrieve job postings. Please check your connection and try again."
+          onReset={() => refetch()}
         >
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
-            </div>
-          ) : jobs.length === 0 ? (
-            <div className="py-24 text-center">
-              <p className="text-sm text-stone-muted">No jobs match your search.</p>
-              {hasActiveFilters && (
-                <button onClick={clearFilters} className="mt-2 text-sm text-accent hover:text-accent-hover font-medium">
-                  Clear filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-stone-muted mb-4">
-                {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} found
-                {hasActiveFilters && <> &middot; <button onClick={clearFilters} className="text-accent hover:text-accent-hover">clear filters</button></>}
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {jobs.map((job) => (
-                  <JobCard key={job._id} job={job} />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-1.5 mt-12 mb-4">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-2 border border-stone-border rounded-lg disabled:opacity-30 hover:bg-white"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`w-8 h-8 text-xs rounded-lg font-medium ${
-                        p === page
-                          ? 'bg-navy text-white'
-                          : 'border border-stone-border hover:bg-white text-stone-muted'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-2 border border-stone-border rounded-lg disabled:opacity-30 hover:bg-white"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
+          {/* Granular Suspense Boundary */}
+          <Suspense fallback={<JobGridSkeleton />}>
+            <FadePresence
+              activeKey={isLoading ? 'loading' : jobs.length === 0 ? 'empty' : 'list'}
+            >
+              {isLoading ? (
+                // Wireframe placeholders eliminate CLS
+                <JobGridSkeleton />
+              ) : jobs.length === 0 ? (
+                // Contextual Empty State
+                <div className="py-12">
+                  <EmptyState
+                    icon={Briefcase}
+                    title="No jobs found matching your criteria"
+                    description="Try adjusting your keywords, selecting a different skill, or broadening your budget range."
+                    actionLabel={hasActiveFilters ? 'Reset Filters' : undefined}
+                    onAction={hasActiveFilters ? resetFilters : undefined}
+                  />
                 </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-xs text-stone-muted mb-4">
+                    <p>
+                      Showing <strong className="text-foreground">{jobs.length}</strong> of{' '}
+                      <strong className="text-foreground">{totalCount}</strong> open listings
+                    </p>
+                    {hasActiveFilters && (
+                      <button
+                        onClick={resetFilters}
+                        className="text-stone-muted hover:text-foreground underline underline-offset-2"
+                      >
+                        Reset filters
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {jobs.map((job: Job) => (
+                      <JobCard key={job._id} job={job} />
+                    ))}
+                  </div>
+
+                  {/* Server-side Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-12 mb-4">
+                      <button
+                        onClick={() => updateFilters({ page: Math.max(1, (filters.page || 1) - 1) })}
+                        disabled={(filters.page || 1) <= 1}
+                        className="p-2 border border-stone-border rounded-lg disabled:opacity-30 hover:bg-white transition-colors"
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => updateFilters({ page: p })}
+                          className={`w-8 h-8 text-xs rounded-lg font-medium transition-colors ${
+                            p === (filters.page || 1)
+                              ? 'bg-navy text-white shadow-xs'
+                              : 'border border-stone-border hover:bg-white text-stone-muted'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() =>
+                          updateFilters({ page: Math.min(totalPages, (filters.page || 1) + 1) })
+                        }
+                        disabled={(filters.page || 1) >= totalPages}
+                        className="p-2 border border-stone-border rounded-lg disabled:opacity-30 hover:bg-white transition-colors"
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </FadePresence>
+            </FadePresence>
+          </Suspense>
+        </IsolatedErrorBoundary>
 
         <div className="h-16" />
       </main>

@@ -155,7 +155,7 @@ export default function Chat() {
     }
     if (refetchedUrlConvRef.current === conversationId) return;
     refetchedUrlConvRef.current = conversationId;
-    void messagesApi.getConversations().then((r) => {
+    void messagesApi.getConversations().then((r: { data: { data?: Conversation[] } }) => {
       setConversations(r.data.data ?? []);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,7 +268,7 @@ export default function Chat() {
       });
 
       if (!conversationsByIdRef.current.has(String(convId))) {
-        void messagesApi.getConversations().then((r) => {
+        void messagesApi.getConversations().then((r: { data: { data?: Conversation[] } }) => {
           setConversations(r.data.data ?? []);
         }).catch(() => {});
       }
@@ -345,7 +345,6 @@ export default function Chat() {
       socket.off('conversation:new', handleConversationNew);
       socket.off('messages:read', handleMessagesRead);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, user?._id, navigate, refreshUnread, trackSeenId]);
 
   // Stable key of other-participant IDs so presence polling only re-runs when the
@@ -558,7 +557,7 @@ export default function Chat() {
                     ))}
                   </div>
                 ) : conversations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full min-h-[200px] p-6 text-center">
+                  <div className="flex flex-col items-center justify-center h-full min-h-50 p-6 text-center">
                     <MessageSquare size={28} className="text-stone-300 mb-3" />
                     <p className="text-sm text-stone-muted">No conversations yet.</p>
                     {user?.role === 'student' && (
@@ -644,7 +643,7 @@ export default function Chat() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{otherFor(activeConv)?.name}</p>
-                      <p className="text-xs text-stone-muted truncate max-w-[140px] md:max-w-xs">
+                      <p className="text-xs text-stone-muted truncate max-w-35 md:max-w-xs">
                         {activeConv.job?.title ?? 'Job no longer available'}
                       </p>
                     </div>
@@ -671,7 +670,7 @@ export default function Chat() {
                   className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-4"
                 >
                   {loadingMsgs ? (
-                    <div className="space-y-3 min-h-[120px]" aria-busy="true" aria-label="Loading messages">
+                    <div className="space-y-3 min-h-30" aria-busy="true" aria-label="Loading messages">
                       {[1, 2, 3, 4, 5].map((i) => (
                         <div key={i} className={`flex ${i % 2 === 0 ? 'justify-end' : ''}`}>
                           <Skeleton
@@ -681,7 +680,7 @@ export default function Chat() {
                       ))}
                     </div>
                   ) : messages.length === 0 ? (
-                    <div className="flex items-center justify-center min-h-[200px]">
+                    <div className="flex items-center justify-center min-h-50">
                       <p className="text-sm text-stone-muted">
                         No messages yet. Say hello!
                       </p>
@@ -714,7 +713,7 @@ export default function Chat() {
                                       <img
                                         src={getFileUrl(msg.fileUrl)}
                                         alt={msg.fileName || 'Image'}
-                                        className="max-w-[240px] max-h-[200px] rounded mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                                        className="max-w-60 max-h-50 rounded mb-2 cursor-pointer hover:opacity-90 transition-opacity"
                                       />
                                     </button>
                                   ) : (
@@ -729,7 +728,7 @@ export default function Chat() {
                                       } transition-colors`}
                                     >
                                       <FileText size={14} />
-                                      <span className="truncate max-w-[180px]">{msg.fileName || 'File'}</span>
+                                      <span className="truncate max-w-45">{msg.fileName || 'File'}</span>
                                       {msg.fileSize && (
                                         <span className="opacity-60 shrink-0">
                                           ({(msg.fileSize / 1024).toFixed(0)} KB)

@@ -1,6 +1,7 @@
 const router  = require('express').Router();
 const crypto  = require('crypto');
 const bcrypt  = require('bcryptjs');
+const argon2  = require('argon2');
 const User    = require('../models/User');
 const protect = require('../middleware/auth');
 const { sendEmail } = require('../services/email');
@@ -11,7 +12,7 @@ const { registerSchema, profileUpdateSchema, validate } = require('../middleware
 // Lazy-initialized dummy hash to prevent timing side-channel on user-not-found
 let _dummyHash = null;
 async function getDummyHash() {
-  if (!_dummyHash) _dummyHash = await bcrypt.hash('dummy-password-for-timing', 10);
+  if (!_dummyHash) _dummyHash = await argon2.hash('dummy-password-for-timing');
   return _dummyHash;
 }
 
@@ -81,7 +82,9 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email }).select('+password +_email2FACode +_email2FACodeExpires');
 
     if (!user) {
-      await bcrypt.compare(password, await getDummyHash());
+      try {
+        await argon2.verify(await getDummyHash(), password);
+      } catch { /* timing protection */ }
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
