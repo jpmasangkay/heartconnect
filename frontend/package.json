@@ -14,7 +14,7 @@
     "@jimp/core": "^0.22.10",
     "@jimp/custom": "^0.22.10",
     "@radix-ui/react-alert-dialog": "^1.1.6",
-    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-slot": "^1.1.2",
     "@react-three/drei": "^9.121.4",
     "@react-three/fiber": "^8.17.14",
